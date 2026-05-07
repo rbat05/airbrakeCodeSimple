@@ -8,3 +8,4 @@ struct BaroData {
 
 bool initBaro();
 BaroData readBaro();
+BaroData printBaro();

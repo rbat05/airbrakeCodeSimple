@@ -8,3 +8,4 @@ struct IMUData {
 
 bool initIMU();
 IMUData readIMU();
+IMUData printIMU();

@@ -60,7 +60,7 @@ static bool flushBuffer() {
     Serial.printf("[BIN] Partial write: %u / %u bytes\n", written, toWrite);
     return false;
   }
-  Serial.printf("[BIN] Flushed %u records (%u bytes)\n", s_count, written);
+  // Serial.printf("[BIN] Flushed %u records (%u bytes)\n", s_count, written);
   s_count = 0;
   return true;
 }

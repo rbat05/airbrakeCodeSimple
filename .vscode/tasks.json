@@ -45,6 +45,21 @@
 				"$gcc"
 			],
 			"group": "build"
+		},
+		{
+			"label": "Build after baro calibration",
+			"type": "shell",
+			"command": "/home/rbat/.platformio/penv/bin/python",
+			"args": [
+				"-m",
+				"platformio",
+				"run"
+			],
+			"isBackground": false,
+			"problemMatcher": [
+				"$gcc"
+			],
+			"group": "build"
 		}
 	]
 }
