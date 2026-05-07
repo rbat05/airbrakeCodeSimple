@@ -1,11 +1,83 @@
+# Control Systems
+We running this shit back fr A+ guaranteed
 
-This directory is intended for PlatformIO Test Runner and project tests.
 
-Unit Testing is a software testing method by which individual units of
-source code, sets of one or more MCU program modules together with associated
-control data, usage procedures, and operating procedures, are tested to
-determine whether they are fit for use. Unit testing finds problems early
-in the development cycle.
 
-More information about PlatformIO Unit Testing:
-- https://docs.platformio.org/en/latest/advanced/unit-testing/index.html
+
+## Git branch procedure - please follow:
+
+# Only the first time you work on this:
+
+install platformIO extension on vscode
+git clone repo-url
+
+# Each time you start working, before you make any changes:
+
+git checkout -b [branch name]
+
+git pull origin main
+
+
+
+# Work on code, then after you have made progress, push to your branch:
+
+git add .
+
+git commit -m "Add something"
+
+git push origin [branch name]
+
+# On GitHub (website), when changes have been reviewed and ONLY DURING A LAB:
+
+Create a Pull Request → review → merge
+
+# After PR is merged, on VS code to remove your local branch:
+
+git checkout main
+
+git pull origin main
+
+git branch -d [branch name]    (to remove repo from local system)
+
+# To List Local Branches in Your Repo and check you are on main (shown in green)
+
+git branch
+
+# FOR RESOLVING CONFLICTS LOCALLY
+
+1. Checkout the branch you want to merge into
+
+git checkout main
+
+
+2. Pull latest changes:
+
+git pull origin main
+
+3. Fetch the branch with changes
+git fetch origin BRANCH_NAME
+
+4. Attempt the merge locally
+git merge origin/BRANCH_NAME
+
+
+You will likely see:
+
+CONFLICT (content): Merge conflict in path/to/file
+
+
+5. Resolve the conflicts manually
+Open the conflicting files in your code editor.
+
+Look for conflict marker.
+
+
+6. Mark conflicts as resolved
+git add path/to/conflicted_file
+
+
+Repeat for all files with conflicts.
+
+7. Commit the merge and push
+git commit
+git push origin main
