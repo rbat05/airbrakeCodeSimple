@@ -21,7 +21,9 @@
 // File header
 static const uint8_t FILE_MAGIC[4] = {0xDE, 0xAD, 0xBE, 0xEF};
 static const uint16_t RECORD_SIZE = sizeof(BinRecord);  // 50
-static const char* BIN_FILE = "/datalog.bin";
+static const char* BIN_FILE_PREFIX = "/datalog_";
+static const char* BIN_FILE_SUFFIX = ".bin";
+static char s_logFile[24] = {0};
 
 // ── Internal state
 // ────────────────────────────────────────────────────────────
@@ -44,7 +46,7 @@ static uint16_t crc16(const uint8_t* data, size_t len) {
 // ── Helpers
 // ───────────────────────────────────────────────────────────────────
 static bool flushBuffer() {
-  File f = SD.open(BIN_FILE, FILE_APPEND);
+  File f = SD.open(s_logFile, FILE_APPEND);
   if (!f) {
     Serial.println("[BIN] Open failed");
     return false;
@@ -63,6 +65,19 @@ static bool flushBuffer() {
   return true;
 }
 
+static bool pickNextLogFileName() {
+  for (uint16_t index = 0; index <= 999; index++) {
+    snprintf(s_logFile, sizeof(s_logFile), "%s%03u%s", BIN_FILE_PREFIX, index,
+             BIN_FILE_SUFFIX);
+    if (!SD.exists(s_logFile)) {
+      return true;
+    }
+  }
+
+  s_logFile[0] = '\0';
+  return false;
+}
+
 // ── Public API
 // ────────────────────────────────────────────────────────────────
 bool initBinLog() {
@@ -73,21 +88,21 @@ bool initBinLog() {
     return false;
   }
 
-  // Write file header only for new files
-  if (!SD.exists(BIN_FILE)) {
-    File f = SD.open(BIN_FILE, FILE_WRITE);
-    if (!f) {
-      Serial.println("[BIN] Cannot create log file");
-      return false;
-    }
-    f.write(FILE_MAGIC, 4);
-    f.write(reinterpret_cast<const uint8_t*>(&RECORD_SIZE), 2);
-    f.close();
-    Serial.printf("[BIN] Created %s (record size: %u bytes)\n", BIN_FILE,
-                  RECORD_SIZE);
-  } else {
-    Serial.printf("[BIN] Appending to existing %s\n", BIN_FILE);
+  if (!pickNextLogFileName()) {
+    Serial.println("[BIN] No free log filename available");
+    return false;
   }
+
+  File f = SD.open(s_logFile, FILE_WRITE);
+  if (!f) {
+    Serial.println("[BIN] Cannot create log file");
+    return false;
+  }
+  f.write(FILE_MAGIC, 4);
+  f.write(reinterpret_cast<const uint8_t*>(&RECORD_SIZE), 2);
+  f.close();
+  Serial.printf("[BIN] Created %s (record size: %u bytes)\n", s_logFile,
+                RECORD_SIZE);
 
   s_ready = true;
   return true;
