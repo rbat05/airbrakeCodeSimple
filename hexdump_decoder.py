@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-decode_log.py — decode datalog.bin produced by sdlog_bin.cpp
+decode_log.py — decode datalog_###.bin produced by the binary logger
 
 Usage:
-    python decode_log.py datalog.bin              # print to stdout
-    python decode_log.py datalog.bin -o out.csv   # save as CSV
+    python decode_log.py datalog_000.bin          # print to stdout
+    python decode_log.py datalog_000.bin -o out.csv   # save as CSV
     python decode_log.py datalog.bin --plot        # quick matplotlib preview
 """
 
@@ -17,15 +17,14 @@ from pathlib import Path
 # ── Constants ──────────────────────────────────────────────────────────────────
 MAGIC           = bytes([0xDE, 0xAD, 0xBE, 0xEF])
 HEADER_SIZE     = 6          # 4-byte magic + 2-byte record size
-RECORD_FMT      = "<Ifffffffffff H"   # little-endian: uint32, 11× float, uint16
-RECORD_SIZE_EXP = struct.calcsize(RECORD_FMT)   # should be 50
+RECORD_FMT      = "<IffffffffH"   # little-endian: uint32, 8× float, uint16
+RECORD_SIZE_EXP = struct.calcsize(RECORD_FMT)   # should be 38
 
 FIELDS = [
     "timestamp_ms",
     "accelX", "accelY", "accelZ",
     "gyroX",  "gyroY",  "gyroZ",
-    "imuTemp",
-    "baroTemp", "pressureHPa", "humidity", "altitudeM",
+    "pressureHPa", "altitudeM",
     "crc16",
 ]
 
@@ -96,7 +95,7 @@ def print_table(records: list[dict]) -> None:
     header = (
         f"{'ms':>10}  {'aX':>8} {'aY':>8} {'aZ':>8}  "
         f"{'gX':>8} {'gY':>8} {'gZ':>8}  "
-        f"{'iT':>6}  {'bT':>6} {'hPa':>8} {'hum':>6} {'alt':>7}"
+        f"{'hPa':>8} {'alt':>7}"
     )
     print(header)
     print("─" * len(header))
@@ -105,9 +104,7 @@ def print_table(records: list[dict]) -> None:
             f"{r['timestamp_ms']:>10}  "
             f"{r['accelX']:>8.4f} {r['accelY']:>8.4f} {r['accelZ']:>8.4f}  "
             f"{r['gyroX']:>8.4f} {r['gyroY']:>8.4f} {r['gyroZ']:>8.4f}  "
-            f"{r['imuTemp']:>6.2f}  "
-            f"{r['baroTemp']:>6.2f} {r['pressureHPa']:>8.2f} "
-            f"{r['humidity']:>6.2f} {r['altitudeM']:>7.2f}"
+            f"{r['pressureHPa']:>8.2f} {r['altitudeM']:>7.2f}"
         )
 
 

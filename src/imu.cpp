@@ -15,6 +15,7 @@ bool initIMU() {
   mpu.setAccelerometerRange(MPU6050_RANGE_8_G);
   mpu.setGyroRange(MPU6050_RANGE_500_DEG);
   mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
+  mpu.setTemperatureStandby(true);
   Serial.println("[IMU] MPU6050 initialised");
   return true;
 }
@@ -30,6 +31,5 @@ IMUData readIMU() {
   d.gyroX = gyro.gyro.x;
   d.gyroY = gyro.gyro.y;
   d.gyroZ = gyro.gyro.z;
-  d.tempC = temp.temperature;
   return d;
 }

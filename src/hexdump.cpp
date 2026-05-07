@@ -6,15 +6,15 @@
 
 // ── Pin config
 // ────────────────────────────────────────────────────────────────
-#define SD_MOSI 23
-#define SD_MISO 19
-#define SD_SCLK 18
-#define SD_CS 5
+#define SD_MOSI 21
+#define SD_MISO 23
+#define SD_SCLK 22
+#define SD_CS 19
 
 // ── Buffer config
 // ───────────────────────────────────────────────────────────── 100 records ×
-// 50 bytes = 5 000 bytes per flush. SD cards prefer writes in multiples of the
-// sector size (512 B). 5 000 B = ~9.7 sectors — close enough; tweak
+// 38 bytes = 3 800 bytes per flush. SD cards prefer writes in multiples of the
+// sector size (512 B). 3 800 B = ~7.4 sectors — close enough; tweak
 // BUFFER_RECORDS to taste.
 #define BUFFER_RECORDS 100
 
@@ -119,10 +119,7 @@ void logSensorsBin(const IMUData& imu, const BaroData& baro) {
   r.gyroX = imu.gyroX;
   r.gyroY = imu.gyroY;
   r.gyroZ = imu.gyroZ;
-  r.imuTemp = imu.tempC;
-  r.baroTemp = baro.tempC;
   r.pressureHPa = baro.pressureHPa;
-  r.humidity = baro.humidity;
   r.altitudeM = baro.altitudeM;
 
   // CRC covers everything except the crc16 field itself

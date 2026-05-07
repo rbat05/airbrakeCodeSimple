@@ -14,9 +14,9 @@ bool initBaro() {
   }
   // Indoor navigation mode — good balance of speed vs noise
   bme.setSampling(Adafruit_BME280::MODE_NORMAL,
-                  Adafruit_BME280::SAMPLING_X2,   // temperature
-                  Adafruit_BME280::SAMPLING_X16,  // pressure
-                  Adafruit_BME280::SAMPLING_X1,   // humidity
+                  Adafruit_BME280::SAMPLING_X2,    // temperature
+                  Adafruit_BME280::SAMPLING_X16,   // pressure
+                  Adafruit_BME280::SAMPLING_NONE,  // humidity disabled
                   Adafruit_BME280::FILTER_X16, Adafruit_BME280::STANDBY_MS_0_5);
   Serial.println("[BARO] BME280 initialised");
   return true;
@@ -24,9 +24,7 @@ bool initBaro() {
 
 BaroData readBaro() {
   BaroData d;
-  d.tempC = bme.readTemperature();
   d.pressureHPa = bme.readPressure() / 100.0f;
-  d.humidity = bme.readHumidity();
   d.altitudeM = bme.readAltitude(SEA_LEVEL_HPA);
   return d;
 }
