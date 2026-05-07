@@ -6,10 +6,10 @@
 
 // ── Pin config
 // ────────────────────────────────────────────────────────────────
-#define SD_MOSI 23
-#define SD_MISO 19
-#define SD_SCLK 18
-#define SD_CS 5
+#define SD_MOSI 21
+#define SD_MISO 23
+#define SD_SCLK 22
+#define SD_CS 19
 
 // ── Buffer config
 // ───────────────────────────────────────────────────────────── Each CSV row is

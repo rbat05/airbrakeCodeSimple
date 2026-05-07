@@ -71,9 +71,9 @@ void setup() {
   bool imuOk = initIMU();
   bool baroOk = initBaro();
 
-  // Serial.println("[MAIN] Initialising SD loggers...");
-  // bool csvOk = initSD();
-  // bool binOk = initBinLog();
+  Serial.println("[MAIN] Initialising SD loggers...");
+  bool csvOk = initSD();
+  bool binOk = initBinLog();
 
   // if (!imuOk || !baroOk || !csvOk || !binOk) {
   //   Serial.println("[MAIN] !! One or more inits failed — check wiring !!");
@@ -88,47 +88,41 @@ void setup() {
   //   }
   // }
 
-  // Serial.printf("[MAIN] All systems go — logging for %lu s at %d Hz\n\n",
-  //               TEST_DURATION_MS / 1000UL, 1000 / SAMPLE_RATE_MS);
-  // s_startMs = millis();
+  Serial.printf("[MAIN] All systems go — logging for %lu s at %d Hz\n\n",
+                TEST_DURATION_MS / 1000UL, 1000 / SAMPLE_RATE_MS);
+  s_startMs = millis();
 }
 
 void loop() {
   // Print imu and baro data to serial
+  if (s_done) return;
 
+  // ── Check test window
+  if (millis() - s_startMs >= TEST_DURATION_MS) {
+    flushLog();     // force-flush remaining CSV rows
+    flushBinLog();  // force-flush remaining binary records
+    printReport();
+    s_done = true;
+    return;
+  }
+
+  // ── Read sensors
   IMUData imu = readIMU();
   BaroData baro = readBaro();
-  printSensors(imu, baro);
-  delay(100);
-  // if (s_done) return;
 
-  // // ── Check test window
-  // ───────────────────────────────────────────────────── if (millis() -
-  // s_startMs >= TEST_DURATION_MS) {
-  //   flushLog();     // force-flush remaining CSV rows
-  //   flushBinLog();  // force-flush remaining binary records
-  //   printReport();
-  //   s_done = true;
-  //   return;
-  // }
+  // Print every 10th sample to serial (avoid flooding at 10 Hz)
+  if (s_sampleCount % 10 == 0) printSensors(imu, baro);
 
-  // // ── Read sensors
-  // ────────────────────────────────────────────────────────── IMUData imu =
-  // readIMU(); BaroData baro = readBaro();
+  // ── Benchmark CSV logger
+  uint32_t t0 = micros();
+  logSensors(imu, baro);
+  s_csvTotalUs += micros() - t0;
 
-  // // Print every 10th sample to serial (avoid flooding at 10 Hz)
-  // if (s_sampleCount % 10 == 0) printSensors(imu, baro);
+  // ── Benchmark binary logger
+  t0 = micros();
+  logSensorsBin(imu, baro);
+  s_binTotalUs += micros() - t0;
 
-  // // ── Benchmark CSV logger
-  // ────────────────────────────────────────────────── uint32_t t0 = micros();
-  // logSensors(imu, baro);
-  // s_csvTotalUs += micros() - t0;
-
-  // // ── Benchmark binary logger
-  // ─────────────────────────────────────────────── t0 = micros();
-  // logSensorsBin(imu, baro);
-  // s_binTotalUs += micros() - t0;
-
-  // s_sampleCount++;
-  // delay(SAMPLE_RATE_MS);
+  s_sampleCount++;
+  delay(SAMPLE_RATE_MS);
 }
