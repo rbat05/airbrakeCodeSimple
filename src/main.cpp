@@ -5,7 +5,7 @@
 #include "hexdump.h"
 #include "imu.h"
 
-#define SAMPLE_RATE_MS 100  // 10 Hz
+#define SAMPLE_RATE_MS 10  // 100 Hz
 
 void setup() {
   Serial.begin(115200);

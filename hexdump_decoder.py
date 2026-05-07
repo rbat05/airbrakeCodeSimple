@@ -5,7 +5,7 @@ decode_log.py — decode datalog_###.bin produced by the binary logger
 Usage:
     python decode_log.py datalog_000.bin          # print to stdout
     python decode_log.py datalog_000.bin -o out.csv   # save as CSV
-    python decode_log.py datalog.bin --plot        # quick matplotlib preview
+    python decode_log.py datalog_000.bin --plot   # quick matplotlib preview
 """
 
 import struct
@@ -17,14 +17,16 @@ from pathlib import Path
 # ── Constants ──────────────────────────────────────────────────────────────────
 MAGIC           = bytes([0xDE, 0xAD, 0xBE, 0xEF])
 HEADER_SIZE     = 6          # 4-byte magic + 2-byte record size
-RECORD_FMT      = "<IffffffffH"   # little-endian: uint32, 8× float, uint16
-RECORD_SIZE_EXP = struct.calcsize(RECORD_FMT)   # should be 38
+RECORD_FMT      = "<IffffffffffffH"   # little-endian: uint32, 12× float, uint16
+RECORD_SIZE_EXP = struct.calcsize(RECORD_FMT)   # should be 54
 
 FIELDS = [
     "timestamp_ms",
     "accelX", "accelY", "accelZ",
     "gyroX",  "gyroY",  "gyroZ",
     "pressureHPa", "altitudeM",
+    "altitudeKalmanM", "velocityKalmanMps",
+    "predictedApogeeM", "servoCommand",
     "crc16",
 ]
 
@@ -95,7 +97,7 @@ def print_table(records: list[dict]) -> None:
     header = (
         f"{'ms':>10}  {'aX':>8} {'aY':>8} {'aZ':>8}  "
         f"{'gX':>8} {'gY':>8} {'gZ':>8}  "
-        f"{'hPa':>8} {'alt':>7}"
+        f"{'hPa':>8} {'alt':>7} {'kAlt':>8} {'kVel':>8} {'apogee':>8} {'servo':>8}"
     )
     print(header)
     print("─" * len(header))
@@ -104,7 +106,9 @@ def print_table(records: list[dict]) -> None:
             f"{r['timestamp_ms']:>10}  "
             f"{r['accelX']:>8.4f} {r['accelY']:>8.4f} {r['accelZ']:>8.4f}  "
             f"{r['gyroX']:>8.4f} {r['gyroY']:>8.4f} {r['gyroZ']:>8.4f}  "
-            f"{r['pressureHPa']:>8.2f} {r['altitudeM']:>7.2f}"
+            f"{r['pressureHPa']:>8.2f} {r['altitudeM']:>7.2f} "
+            f"{r['altitudeKalmanM']:>8.2f} {r['velocityKalmanMps']:>8.2f} "
+            f"{r['predictedApogeeM']:>8.2f} {r['servoCommand']:>8.2f}"
         )
 
 

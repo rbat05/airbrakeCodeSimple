@@ -30,6 +30,21 @@
 				"$gcc"
 			],
 			"group": "build"
+		},
+		{
+			"label": "Build hexdump schema update",
+			"type": "shell",
+			"command": "/home/rbat/.platformio/penv/bin/python",
+			"args": [
+				"-m",
+				"platformio",
+				"run"
+			],
+			"isBackground": false,
+			"problemMatcher": [
+				"$gcc"
+			],
+			"group": "build"
 		}
 	]
 }

@@ -4,7 +4,7 @@
 #include "baro.h"
 #include "imu.h"
 
-// ── On-disk record layout (38 bytes, packed)
+// ── On-disk record layout (54 bytes, packed)
 // ──────────────────────────────────
 //
 //  Offset  Size  Type    Field
@@ -18,12 +18,16 @@
 //  24      4     float   gyroZ
 //  28      4     float   pressureHPa
 //  32      4     float   altitudeM
-//  36      2     uint16  crc16  (covers bytes 0-35)
+//  36      4     float   altitudeKalmanM
+//  40      4     float   velocityKalmanMps
+//  44      4     float   predictedApogeeM
+//  48      4     float   servoCommand
+//  52      2     uint16  crc16  (covers bytes 0-51)
 //  ──────  ────
-//  Total: 38 bytes per record
+//  Total: 54 bytes per record
 //
 // File starts with a 4-byte magic number: 0xDEAD 0xBEEF
-// followed by a 2-byte record size (38) for forward-compat.
+// followed by a 2-byte record size (54) for forward-compat.
 // ─────────────────────────────────────────────────────────────────────────────
 
 #pragma pack(push, 1)
@@ -32,11 +36,15 @@ struct BinRecord {
   float accelX, accelY, accelZ;
   float gyroX, gyroY, gyroZ;
   float pressureHPa, altitudeM;
+  float altitudeKalmanM;
+  float velocityKalmanMps;
+  float predictedApogeeM;
+  float servoCommand;
   uint16_t crc16;
 };
 #pragma pack(pop)
 
-static_assert(sizeof(BinRecord) == 38, "BinRecord size mismatch");
+static_assert(sizeof(BinRecord) == 54, "BinRecord size mismatch");
 
 bool initBinLog();
 void logSensorsBin(const IMUData& imu, const BaroData& baro);
