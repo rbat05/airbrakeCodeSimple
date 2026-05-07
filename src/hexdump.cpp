@@ -13,14 +13,14 @@
 
 // ── Buffer config
 // ───────────────────────────────────────────────────────────── 100 records ×
-// 38 bytes = 3 800 bytes per flush. SD cards prefer writes in multiples of the
-// sector size (512 B). 3 800 B = ~7.4 sectors — close enough; tweak
+// 54 bytes = 5 400 bytes per flush. SD cards prefer writes in multiples of the
+// sector size (512 B). 5 400 B = ~10.5 sectors — close enough; tweak
 // BUFFER_RECORDS to taste.
 #define BUFFER_RECORDS 100
 
 // File header
 static const uint8_t FILE_MAGIC[4] = {0xDE, 0xAD, 0xBE, 0xEF};
-static const uint16_t RECORD_SIZE = sizeof(BinRecord);  // 50
+static const uint16_t RECORD_SIZE = sizeof(BinRecord);  // 54
 static const char* BIN_FILE_PREFIX = "/datalog_";
 static const char* BIN_FILE_SUFFIX = ".bin";
 static char s_logFile[24] = {0};
@@ -121,6 +121,13 @@ void logSensorsBin(const IMUData& imu, const BaroData& baro) {
   r.gyroZ = imu.gyroZ;
   r.pressureHPa = baro.pressureHPa;
   r.altitudeM = baro.altitudeM;
+
+  // TODO(control): Replace these placeholders with live estimator/controller
+  // outputs.
+  r.altitudeKalmanM = 0.0f;
+  r.velocityKalmanMps = 0.0f;
+  r.predictedApogeeM = 0.0f;
+  r.servoCommand = 0.0f;
 
   // CRC covers everything except the crc16 field itself
   r.crc16 = crc16(reinterpret_cast<const uint8_t*>(&r),
