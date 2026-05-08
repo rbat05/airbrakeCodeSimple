@@ -8,6 +8,9 @@
 #include "ekf.h"
 
 #include "airbraketest.h"
+#include "Dynamics.h"
+#include "RocketVariables.h"
+
 
 // Set to 1 to enable Hardware-In-The-Loop simulation, 0 for real sensors
 #ifndef ENABLE_HITL
@@ -35,6 +38,8 @@ static uint32_t s_imuTimeUs = 0, s_baroTimeUs = 0, s_logTimeUs = 0;
 float dt;
 EKF ekf;
 float velocity = 0;
+float u_prev = 0.0;
+float u = 0.0;
 
 static void stepServo() {
   s_servo.write(s_servoAngle);
@@ -198,7 +203,14 @@ void loop() {
   ekf_predict(&ekf, accel_vertical, gyro_pitch, gyro_yaw);
   // float barometer_raw = baro.altitudeM;   // metres
   ekf_update(&ekf, barometer_raw);
-  
+
+  if (ekf.x[0] > 100.0) {
+    u = OptimiseControlInputBinarySearchConstraint(ekf.x[0], ekf.x[1], u_prev, 0);
+    // SetServoAngle(u);   // u = 0–180 degrees
+    u_prev = u; 
+    float h_pred = PredictApogee(ekf.x[0], ekf.x[1], u);
+  }
+
   Serial.printf(
     "%lu,%.3f,%.3f,%.3f,%.3f\n",
     millis(),
