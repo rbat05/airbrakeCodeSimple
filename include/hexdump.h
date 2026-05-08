@@ -1,6 +1,7 @@
 #pragma once
 #include <Arduino.h>
 
+#include "Dynamics.h"
 #include "baro.h"
 #include "imu.h"
 
@@ -47,5 +48,6 @@ struct BinRecord {
 static_assert(sizeof(BinRecord) == 54, "BinRecord size mismatch");
 
 bool initBinLog();
-void logSensorsBin(const IMUData& imu, const BaroData& baro);
+void logSensorsBin(const IMUData& imu, const BaroData& baro,
+                   const ModelData& modelData);
 void flushBinLog();

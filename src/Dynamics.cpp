@@ -237,6 +237,13 @@ int ApogeeDetected() {
   }
 }
 
+ModelData setModelData(float predictedApogeeM, float servoCommand) {
+  ModelData d;
+  d.predictedApogeeM = predictedApogeeM;
+  d.servoCommand = servoCommand;
+  return d;
+}
+
 // i want control loop to run at fixed frequency - using timer/interupt?
 // need to log altitude, velocity, orientation, control input, predicted apogee,
 // drag coefficent to sd card - ill do later

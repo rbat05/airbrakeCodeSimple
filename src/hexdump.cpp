@@ -16,7 +16,7 @@
 // 54 bytes = 5 400 bytes per flush. SD cards prefer writes in multiples of the
 // sector size (512 B). 5 400 B = ~10.5 sectors — close enough; tweak
 // BUFFER_RECORDS to taste.
-#define BUFFER_RECORDS 100
+#define BUFFER_RECORDS 25
 
 // File header
 static const uint8_t FILE_MAGIC[4] = {0xDE, 0xAD, 0xBE, 0xEF};
@@ -108,7 +108,8 @@ bool initBinLog() {
   return true;
 }
 
-void logSensorsBin(const IMUData& imu, const BaroData& baro) {
+void logSensorsBin(const IMUData& imu, const BaroData& baro,
+                   const ModelData& modelData) {
   if (!s_ready) return;
 
   BinRecord& r = s_buf[s_count];
@@ -124,10 +125,11 @@ void logSensorsBin(const IMUData& imu, const BaroData& baro) {
 
   // TODO(control): Replace these placeholders with live estimator/controller
   // outputs.
+  // r.velocityBeforeKalman = 0.0f; // Integration of accelY over time
   r.altitudeKalmanM = 0.0f;
   r.velocityKalmanMps = 0.0f;
-  r.predictedApogeeM = 0.0f;
-  r.servoCommand = 0.0f;
+  r.predictedApogeeM = modelData.predictedApogeeM;
+  r.servoCommand = modelData.servoCommand;
 
   // CRC covers everything except the crc16 field itself
   r.crc16 = crc16(reinterpret_cast<const uint8_t*>(&r),

@@ -13,7 +13,7 @@
 
 // Set to 1 to enable Hardware-In-The-Loop simulation, 0 for real sensors
 #ifndef ENABLE_HITL
-#define ENABLE_HITL 1
+#define ENABLE_HITL 0
 #endif
 
 #if ENABLE_HITL
@@ -39,6 +39,7 @@ EKF ekf;
 float velocity = 0;
 float u_prev = 0.0;
 float u = 0.0;
+float h_pred = 0.0;
 
 static void stepServo() {
   s_servo.write(s_servoAngle);
@@ -50,73 +51,6 @@ static void stepServo() {
   } else if (s_servoAngle <= 0) {
     s_servoAngle = 0;
     s_servoDirection = 1;
-  }
-}
-
-// Chuck all code that always runs in loop below the sensor reads
-// Empty loop is ideal for profiling the overhead of the sensor reads + logging
-static void loggingProfiler() {
-  // Time IMU read
-  uint32_t t0 = micros();
-  IMUData imu = readIMU();
-  s_imuTimeUs += (micros() - t0);
-
-  // Time Baro read
-  uint32_t t1 = micros();
-  BaroData baro = readBaro();
-  s_baroTimeUs += (micros() - t1);
-
-  // Add whatever other functions that need to be ran here
-  // EKF, Model Estimation, Servo control, etc.
-  // stepServo();
-  // delay(50);
-
-  // Time logging
-  uint32_t t2 = micros();
-  logSensorsBin(imu, baro);
-  s_logTimeUs += (micros() - t2);
-
-  s_profileSamples++;  // Check this variables increment speed. Set
-                       // s_profileSamples accordingly
-  uint32_t nowMs = millis();
-
-  if (s_profileStartMs == 0) {
-    s_profileStartMs = nowMs;
-  }
-
-  uint32_t windowMs = nowMs - s_profileStartMs;
-  if (s_profileSamples >= 100 && windowMs > 0) {
-    float windowSec = windowMs / 1000.0f;
-    float avgImuUs = s_imuTimeUs / static_cast<float>(s_profileSamples);
-    float avgBaroUs = s_baroTimeUs / static_cast<float>(s_profileSamples);
-    float avgLogUs = s_logTimeUs / static_cast<float>(s_profileSamples);
-    float avgLoopUs = (avgImuUs + avgBaroUs + avgLogUs);
-    float actualHz = s_profileSamples / windowSec;
-    float maxFreqHz = 1e6f / avgLoopUs;
-
-    Serial.println("\n[PROFILE] Time window:");
-    Serial.printf("  Window: %.2f s, samples: %u\n", windowSec,
-                  s_profileSamples);
-    Serial.printf("  IMU read:    %.1f µs/sample\n", avgImuUs);
-    Serial.printf("  Baro read:   %.1f µs/sample\n", avgBaroUs);
-    Serial.printf("  Logging:     %.1f µs/sample\n", avgLogUs);
-    Serial.printf("  Total overhead: %.1f µs/sample\n", avgLoopUs);
-    Serial.printf("  Current rate: %.1f Hz\n", actualHz);
-    Serial.printf("  Max achievable (no delay): %.0f Hz\n", maxFreqHz);
-
-    // Buffer info
-    uint16_t bufRecords = 100;  // BUFFER_RECORDS
-    float bufTimeSec = bufRecords / actualHz;
-    Serial.printf("  Buffer: %u records × 54 bytes = %u bytes\n", bufRecords,
-                  bufRecords * 54);
-    Serial.printf("  Flush interval: %.2f seconds at current rate\n",
-                  bufTimeSec);
-
-    s_profileStartMs = nowMs;
-    s_profileSamples = 0;
-    s_imuTimeUs = 0;
-    s_baroTimeUs = 0;
-    s_logTimeUs = 0;
   }
 }
 
@@ -148,23 +82,14 @@ void setup() {
 #endif
   bool binOk = initBinLog();
 
-  // Serial.printf("[MAIN] IMU init: %s\n", imuOk ? "OK" : "FAIL");
-  // Serial.printf("[MAIN] Baro init: %s\n", baroOk ? "OK" : "FAIL");
-  // Serial.printf("[MAIN] BinLog init: %s\n", binOk ? "OK" : "FAIL");
+  Serial.printf("[MAIN] IMU init: %s\n", imuOk ? "OK" : "FAIL");
+  Serial.printf("[MAIN] Baro init: %s\n", baroOk ? "OK" : "FAIL");
+  Serial.printf("[MAIN] BinLog init: %s\n", binOk ? "OK" : "FAIL");
 
   float h0 = 0;
 
   dt = 0.1f;  // 100Hz IMU rate (Can control to be loop rate)
   ekf_init(&ekf, dt, h0);
-
-  // if (!imuOk || !baroOk || !binOk) {
-  //   Serial.println("[MAIN] !! One or more inits failed — check wiring !!");
-  //   Serial.printf("  IMU: %s  BARO: %s  BIN: %s\n", imuOk ? "OK" : "FAIL",
-  //                 baroOk ? "OK" : "FAIL", binOk ? "OK" : "FAIL");
-  //   while (true) {
-  //     delay(1000);
-  //   }
-  // }
 
   // Serial.printf("[MAIN] Logging binary sensor data at %d Hz\n\n",
   //               1000 / SAMPLE_RATE_MS);
@@ -181,8 +106,9 @@ void loop() {
   IMUData imu = readIMU();
   BaroData baro = readBaro();
 #endif
-  logSensorsBin(imu, baro);
-  delay(SAMPLE_RATE_MS);
+
+  // MPU Alignment Code
+  // printIMU();
 
   static uint32_t prev_ms = millis();
   uint32_t now = millis();
@@ -205,13 +131,23 @@ void loop() {
     u = OptimiseControlInputBinarySearchConstraint(ekf.x[0], ekf.x[1], u_prev,
                                                    0);
     SetServoAngle(u);  // u = 0–180 degrees
+
+    // Note: h_pred and u are only calculated when the EKF altitude estimate is
+    // above 100m, h_pred is predicted apogee, u is servo command
+
     u_prev = u;
-    float h_pred = PredictApogee(ekf.x[0], ekf.x[1], u);
+    h_pred = PredictApogee(ekf.x[0], ekf.x[1], u);
   }
 
-  Serial.printf("%lu,%.3f,%.3f,%.3f,%.3f\n", millis(), barometer_raw, velocity,
-                ekf.x[0], ekf.x[1]);
-  delay(100);
+  ModelData modelData = setModelData(h_pred, u);
+
+  logSensorsBin(imu, baro, modelData);
+  delay(SAMPLE_RATE_MS);
+
+  // Serial.printf("%lu,%.3f,%.3f,%.3f,%.3f\n", millis(), barometer_raw,
+  // velocity,
+  //               ekf.x[0], ekf.x[1]);
+  // delay(100);
 
   // Serial.printf("[SENSOR] Alt: %.2f m, Press: %.2f hPa, AccelY: %.2f m/s²\n",
   //               baro.altitudeM, baro.pressureHPa, imu.accelY);
