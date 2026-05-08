@@ -1,0 +1,65 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Build binary logger",
+			"type": "shell",
+			"command": "/home/rbat/.platformio/penv/bin/python",
+			"args": [
+				"-m",
+				"platformio",
+				"run"
+			],
+			"isBackground": false,
+			"problemMatcher": [
+				"$gcc"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Build binary logger",
+			"type": "shell",
+			"command": "/home/rbat/.platformio/penv/bin/python",
+			"args": [
+				"-m",
+				"platformio",
+				"run"
+			],
+			"isBackground": false,
+			"problemMatcher": [
+				"$gcc"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Build hexdump schema update",
+			"type": "shell",
+			"command": "/home/rbat/.platformio/penv/bin/python",
+			"args": [
+				"-m",
+				"platformio",
+				"run"
+			],
+			"isBackground": false,
+			"problemMatcher": [
+				"$gcc"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Build after baro calibration",
+			"type": "shell",
+			"command": "/home/rbat/.platformio/penv/bin/python",
+			"args": [
+				"-m",
+				"platformio",
+				"run"
+			],
+			"isBackground": false,
+			"problemMatcher": [
+				"$gcc"
+			],
+			"group": "build"
+		}
+	]
+}

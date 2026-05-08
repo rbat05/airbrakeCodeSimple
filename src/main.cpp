@@ -1,129 +1,152 @@
 #include <Arduino.h>
+#include <ESP32Servo.h>
 #include <Wire.h>
 
 #include "baro.h"
 #include "hexdump.h"
 #include "imu.h"
-#include "sd.h"
-#include "ekf.h"
-#include "BluetoothSerial.h"
 
-BluetoothSerial SerialBT;
+#define SAMPLE_RATE_MS 10  // 1000 Hz
+#define SERVO_PIN 16
+#define SERVO_STEP_MS 1000
 
-// ── Test config
-#define SAMPLE_RATE_MS 100      // 10 Hz
-#define TEST_DURATION_MS 30000  // run for 30 s then stop and report
+static Servo s_servo;
+static int s_servoAngle = 0;
+static int s_servoDirection = 1;
+static uint32_t s_lastServoStepMs = 0;
+static uint32_t s_profileStartMs = 0;
+static uint32_t s_profileSamples = 0;
+static uint32_t s_imuTimeUs = 0, s_baroTimeUs = 0, s_logTimeUs = 0;
 
-// ── State
-static uint32_t s_sampleCount = 0;
-static uint32_t s_startMs = 0;
-static bool s_done = false;
+static void stepServo() {
+  s_servo.write(s_servoAngle);
 
-// Timing accumulators for benchmarking
-static uint32_t s_csvTotalUs = 0;
-static uint32_t s_binTotalUs = 0;
-
-// LED Pin
-static const uint8_t LED_PIN = 2;
-
-// ── Helpers
-static void printSensors(const IMUData& imu, const BaroData& baro) {
-  Serial.printf(
-      "[%6lu ms] "
-      "Accel: %6.3f %6.3f %6.3f m/s²  "
-      "Gyro: %6.2f %6.2f %6.2f °/s  "
-      "imuT: %.1f°C  "
-      "baroT: %.1f°C  %.1f hPa  %.1f%%  %.1fm\n",
-      millis(), imu.accelX, imu.accelY, imu.accelZ, imu.gyroX, imu.gyroY,
-      imu.gyroZ, imu.tempC, baro.tempC, baro.pressureHPa, baro.humidity,
-      baro.altitudeM);
-}
-
-static void printReport() {
-  Serial.println("\n════════════════════════════════════════");
-  Serial.println("           LOGGER BENCHMARK REPORT");
-  Serial.println("════════════════════════════════════════");
-  Serial.printf("  Samples collected : %lu\n", s_sampleCount);
-  Serial.printf("  Duration          : %.1f s\n", TEST_DURATION_MS / 1000.0f);
-  Serial.printf("  Sample rate       : %d Hz\n", 1000 / SAMPLE_RATE_MS);
-  Serial.println("----------------------------------------");
-  if (s_sampleCount > 0) {
-    float csvAvgUs = (float)s_csvTotalUs / s_sampleCount;
-    float binAvgUs = (float)s_binTotalUs / s_sampleCount;
-    Serial.printf("  CSV avg per call  : %.1f µs\n", csvAvgUs);
-    Serial.printf("  BIN avg per call  : %.1f µs\n", binAvgUs);
-    Serial.printf("  Speedup (bin/csv) : %.2fx faster\n",
-                  csvAvgUs / max(binAvgUs, 0.01f));
+  s_servoAngle += s_servoDirection * 10;
+  if (s_servoAngle >= 180) {
+    s_servoAngle = 180;
+    s_servoDirection = -1;
+  } else if (s_servoAngle <= 0) {
+    s_servoAngle = 0;
+    s_servoDirection = 1;
   }
-  Serial.println("════════════════════════════════════════");
-  Serial.println("  Buffers flushed to SD. Check:");
-  Serial.println("    /datalog.csv  — open in Excel / any editor");
-  Serial.println("    /datalog.bin  — decode with decode_log.py");
-  Serial.println("════════════════════════════════════════\n");
 }
 
-// ── Arduino entry points
+// Chuck all code that always runs in loop below the sensor reads
+// Empty loop is ideal for profiling the overhead of the sensor reads + logging
+static void loggingProfiler() {
+  // Time IMU read
+  uint32_t t0 = micros();
+  IMUData imu = readIMU();
+  s_imuTimeUs += (micros() - t0);
 
-BaroData baro;
-IMUData imu;
-EKF ekf;
-float dt;
-float velocity = 0.0f;
+  // Time Baro read
+  uint32_t t1 = micros();
+  BaroData baro = readBaro();
+  s_baroTimeUs += (micros() - t1);
 
+  // Add whatever other functions that need to be ran here
+  // EKF, Model Estimation, Servo control, etc.
+  // stepServo();
+  // delay(50);
+
+  // Time logging
+  uint32_t t2 = micros();
+  logSensorsBin(imu, baro);
+  s_logTimeUs += (micros() - t2);
+
+  s_profileSamples++;  // Check this variables increment speed. Set
+                       // s_profileSamples accordingly
+  uint32_t nowMs = millis();
+
+  if (s_profileStartMs == 0) {
+    s_profileStartMs = nowMs;
+  }
+
+  uint32_t windowMs = nowMs - s_profileStartMs;
+  if (s_profileSamples >= 100 && windowMs > 0) {
+    float windowSec = windowMs / 1000.0f;
+    float avgImuUs = s_imuTimeUs / static_cast<float>(s_profileSamples);
+    float avgBaroUs = s_baroTimeUs / static_cast<float>(s_profileSamples);
+    float avgLogUs = s_logTimeUs / static_cast<float>(s_profileSamples);
+    float avgLoopUs = (avgImuUs + avgBaroUs + avgLogUs);
+    float actualHz = s_profileSamples / windowSec;
+    float maxFreqHz = 1e6f / avgLoopUs;
+
+    Serial.println("\n[PROFILE] Time window:");
+    Serial.printf("  Window: %.2f s, samples: %u\n", windowSec,
+                  s_profileSamples);
+    Serial.printf("  IMU read:    %.1f µs/sample\n", avgImuUs);
+    Serial.printf("  Baro read:   %.1f µs/sample\n", avgBaroUs);
+    Serial.printf("  Logging:     %.1f µs/sample\n", avgLogUs);
+    Serial.printf("  Total overhead: %.1f µs/sample\n", avgLoopUs);
+    Serial.printf("  Current rate: %.1f Hz\n", actualHz);
+    Serial.printf("  Max achievable (no delay): %.0f Hz\n", maxFreqHz);
+
+    // Buffer info
+    uint16_t bufRecords = 100;  // BUFFER_RECORDS
+    float bufTimeSec = bufRecords / actualHz;
+    Serial.printf("  Buffer: %u records × 54 bytes = %u bytes\n", bufRecords,
+                  bufRecords * 54);
+    Serial.printf("  Flush interval: %.2f seconds at current rate\n",
+                  bufTimeSec);
+
+    s_profileStartMs = nowMs;
+    s_profileSamples = 0;
+    s_imuTimeUs = 0;
+    s_baroTimeUs = 0;
+    s_logTimeUs = 0;
+  }
+}
 
 void setup() {
   Serial.begin(115200);
-  SerialBT.begin("ESP32-Sensor-Logger"); // Bluetooth device name
-  delay(2000);  // let the monitor connect
-  // Serial.println("\n[MAIN] ESP32 Sensor Logger Test");
-  // Serial.println("[MAIN] Initialising I2C sensors...");
-  // SerialBT.println("\n[MAIN] ESP32 Bluetooth Started");
-  //delay(1000);  // let Bluetooth initialize 
+  delay(500);  // let the monitor connect
+  Serial.println("\n[MAIN] ESP32 Sensor Logger");
+  Serial.println(
+      "[MAIN] Initialising I2C sensors on Wire (SDA=GPIO33, SCL=GPIO32)");
+
   Wire.begin(33, 32);  // SDA=GPIO33, SCL=GPIO32
 
-
-
+  s_servo.setPeriodHertz(50);
+  s_servo.attach(SERVO_PIN, 500, 2400);
+  stepServo();
 
   bool imuOk = initIMU();
   bool baroOk = initBaro();
+  bool binOk = initBinLog();
 
-
-  baro = readBaro();
-  float h0 = baro.altitudeM;  // use first baro reading as height reference for EKF
-
-  // Serial.println("[MAIN] Initialising SD loggers...");
-  // bool csvOk = initSD();
-  // bool binOk = initBinLog();
-
-  // if (!imuOk || !baroOk || !csvOk || !binOk) {
-  //   Serial.println("[MAIN] !! One or more inits failed — check wiring !!");
-  //   Serial.printf("  IMU: %s  BARO: %s  CSV-SD: %s  BIN-SD: %s\n",
-  //                 imuOk ? "OK" : "FAIL", baroOk ? "OK" : "FAIL",
-  //                 csvOk ? "OK" : "FAIL", binOk ? "OK" : "FAIL");
-  //   // Halt — blink LED as error indicator
-  //   pinMode(LED_PIN, OUTPUT);
-  //   while (true) {
-  //     digitalWrite(LED_PIN, !digitalRead(LED_PIN));
-  //     delay(200);
-  //   }
-  // }
+  Serial.printf("[MAIN] IMU init: %s\n", imuOk ? "OK" : "FAIL");
+  Serial.printf("[MAIN] Baro init: %s\n", baroOk ? "OK" : "FAIL");
+  Serial.printf("[MAIN] BinLog init: %s\n", binOk ? "OK" : "FAIL");
+  
+  float h0 = 0;
+  
   dt= 0.1f;   // 100Hz IMU rate (Can control to be loop rate)
   ekf_init(&ekf, dt, h0);
-  // Serial.printf("[MAIN] All systems go — logging for %lu s at %d Hz\n\n",
-  //               TEST_DURATION_MS / 1000UL, 1000 / SAMPLE_RATE_MS);
-  // s_startMs = millis();
+
+  // if (!imuOk || !baroOk || !binOk) {
+  //   Serial.println("[MAIN] !! One or more inits failed — check wiring !!");
+  //   Serial.printf("  IMU: %s  BARO: %s  BIN: %s\n", imuOk ? "OK" : "FAIL",
+  //                 baroOk ? "OK" : "FAIL", binOk ? "OK" : "FAIL");
+  //   while (true) {
+  //     delay(1000);
+  //   }
+  // }
+
+  Serial.printf("[MAIN] Logging binary sensor data at %d Hz\n\n",
+                1000 / SAMPLE_RATE_MS);
 }
 
 void loop() {
-  // Print imu and baro data to serial
+  // loggingProfiler();
 
-  imu = readIMU();
-  baro = readBaro();
-  //printSensors(imu, baro);
+  IMUData imu = readIMU();
+  BaroData baro = readBaro();
+  logSensorsBin(imu, baro);
+  delay(SAMPLE_RATE_MS);
+  
   static uint32_t prev_ms = millis();
   uint32_t now = millis();
-  
-
   dt = (now - prev_ms) / 1000.0f;
   prev_ms = now;
  // print all three accelerations and gyros to serial
@@ -135,25 +158,11 @@ void loop() {
   float gyro_pitch = imu.gyroX;     // rad/s
   float barometer_raw = baro.altitudeM + 42;   // metres
 
-  // serial print accel and gyro value for pitch, yaw and vertical accel
-  //Serial.printf("\nAccel vertical: %.2f m/s^2  Gyro pitch: %.2f °/s  Gyro yaw: %.2f °/s\n", accel_vertical, gyro_pitch, gyro_yaw);
-  //SerialBT.printf("\nAccel vertical
-   //velocity = velocity + accel_vertical * dt;  // simple velocity estimate by integrating accel (for comparison with EKF)
-   // simple velocity estimate by integrating accel (for comparison with EKF)
-  //Serial.printf("\nHeight before EKF : %.2f m  Velocity: %.2f m/s\n", barometer_raw, velocity);
-  //SerialBT.printf("\nHeight before EKF : %.2f m  Velocity: %.2f m/s\n", barometer_raw, velocity);
-  //delay(100);
   ekf_predict(&ekf, accel_vertical, gyro_pitch, gyro_yaw);
   // float barometer_raw = baro.altitudeM;   // metres
   ekf_update(&ekf, barometer_raw);
-
-  //Serial.printf(
-  //  "\nHeight after EKF : %.2f m  Velocity: %.2f m/s\n",
-  //  ekf.x[0],
-  //  ekf.x[1] );
-
-
-  Serial.printf(
+  
+   Serial.printf(
     "%lu,%.3f,%.3f,%.3f,%.3f\n",
     millis(),
     barometer_raw,
@@ -162,37 +171,5 @@ void loop() {
     ekf.x[1]
   );
   delay(100);
-
-  // if (s_done) return;
-
-  // // ── Check test window
-  // ───────────────────────────────────────────────────── if (millis() -
-  // s_startMs >= TEST_DURATION_MS) {
-  //   flushLog();     // force-flush remaining CSV rows
-  //   flushBinLog();  // force-flush remaining binary records
-  //   printReport();
-  //   s_done = true;
-  //   return;
-  // }
-
-  // // ── Read sensors
-  // ────────────────────────────────────────────────────────── IMUData imu =
-  // readIMU(); BaroData baro = readBaro();
-
-  // // Print every 10th sample to serial (avoid flooding at 10 Hz)
-  // if (s_sampleCount % 10 == 0) printSensors(imu, baro);
-
-  // // ── Benchmark CSV logger
-  // ────────────────────────────────────────────────── uint32_t t0 = micros();
-  // logSensors(imu, baro);
-  // s_csvTotalUs += micros() - t0;
-
-  // // ── Benchmark binary logger
-  // ─────────────────────────────────────────────── t0 = micros();
-  // logSensorsBin(imu, baro);
-  // s_binTotalUs += micros() - t0;
-
-  // s_sampleCount++;
-  // delay(SAMPLE_RATE_MS);
-
+  
 }

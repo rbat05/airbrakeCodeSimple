@@ -6,21 +6,21 @@
 
 // ── Pin config
 // ────────────────────────────────────────────────────────────────
-#define SD_MOSI 23
-#define SD_MISO 19
-#define SD_SCLK 18
-#define SD_CS 5
+#define SD_MOSI 21
+#define SD_MISO 23
+#define SD_SCLK 22
+#define SD_CS 19
 
 // ── Buffer config
 // ───────────────────────────────────────────────────────────── 100 records ×
-// 50 bytes = 5 000 bytes per flush. SD cards prefer writes in multiples of the
-// sector size (512 B). 5 000 B = ~9.7 sectors — close enough; tweak
+// 54 bytes = 5 400 bytes per flush. SD cards prefer writes in multiples of the
+// sector size (512 B). 5 400 B = ~10.5 sectors — close enough; tweak
 // BUFFER_RECORDS to taste.
 #define BUFFER_RECORDS 100
 
 // File header
 static const uint8_t FILE_MAGIC[4] = {0xDE, 0xAD, 0xBE, 0xEF};
-static const uint16_t RECORD_SIZE = sizeof(BinRecord);  // 50
+static const uint16_t RECORD_SIZE = sizeof(BinRecord);  // 54
 static const char* BIN_FILE_PREFIX = "/datalog_";
 static const char* BIN_FILE_SUFFIX = ".bin";
 static char s_logFile[24] = {0};
@@ -60,7 +60,7 @@ static bool flushBuffer() {
     Serial.printf("[BIN] Partial write: %u / %u bytes\n", written, toWrite);
     return false;
   }
-  Serial.printf("[BIN] Flushed %u records (%u bytes)\n", s_count, written);
+  // Serial.printf("[BIN] Flushed %u records (%u bytes)\n", s_count, written);
   s_count = 0;
   return true;
 }
@@ -119,11 +119,15 @@ void logSensorsBin(const IMUData& imu, const BaroData& baro) {
   r.gyroX = imu.gyroX;
   r.gyroY = imu.gyroY;
   r.gyroZ = imu.gyroZ;
-  r.imuTemp = imu.tempC;
-  r.baroTemp = baro.tempC;
   r.pressureHPa = baro.pressureHPa;
-  r.humidity = baro.humidity;
   r.altitudeM = baro.altitudeM;
+
+  // TODO(control): Replace these placeholders with live estimator/controller
+  // outputs.
+  r.altitudeKalmanM = 0.0f;
+  r.velocityKalmanMps = 0.0f;
+  r.predictedApogeeM = 0.0f;
+  r.servoCommand = 0.0f;
 
   // CRC covers everything except the crc16 field itself
   r.crc16 = crc16(reinterpret_cast<const uint8_t*>(&r),
