@@ -118,6 +118,11 @@ void setup() {
   Serial.printf("[MAIN] IMU init: %s\n", imuOk ? "OK" : "FAIL");
   Serial.printf("[MAIN] Baro init: %s\n", baroOk ? "OK" : "FAIL");
   Serial.printf("[MAIN] BinLog init: %s\n", binOk ? "OK" : "FAIL");
+  
+  float h0 = 0;
+  
+  dt= 0.1f;   // 100Hz IMU rate (Can control to be loop rate)
+  ekf_init(&ekf, dt, h0);
 
   // if (!imuOk || !baroOk || !binOk) {
   //   Serial.println("[MAIN] !! One or more inits failed — check wiring !!");
@@ -139,4 +144,32 @@ void loop() {
   BaroData baro = readBaro();
   logSensorsBin(imu, baro);
   delay(SAMPLE_RATE_MS);
+  
+  static uint32_t prev_ms = millis();
+  uint32_t now = millis();
+  dt = (now - prev_ms) / 1000.0f;
+  prev_ms = now;
+ // print all three accelerations and gyros to serial
+  //float accel_z = imu.accelZ;    // m/s^2
+  //float gyro_y = imu.gyroY;     // rad/s
+  float gyro_yaw = imu.gyroZ;     // rad/s
+  float accel_vertical = imu.accelY - 9.81f;    // m/s^2
+  // float accel_x = imu.accelX;    // m/s^2
+  float gyro_pitch = imu.gyroX;     // rad/s
+  float barometer_raw = baro.altitudeM + 42;   // metres
+
+  ekf_predict(&ekf, accel_vertical, gyro_pitch, gyro_yaw);
+  // float barometer_raw = baro.altitudeM;   // metres
+  ekf_update(&ekf, barometer_raw);
+  
+   Serial.printf(
+    "%lu,%.3f,%.3f,%.3f,%.3f\n",
+    millis(),
+    barometer_raw,
+    velocity,
+    ekf.x[0],
+    ekf.x[1]
+  );
+  delay(100);
+  
 }
