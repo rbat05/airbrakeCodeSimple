@@ -7,6 +7,15 @@
 #include "imu.h"
 #include "ekf.h"
 
+// Set to 1 to enable Hardware-In-The-Loop simulation, 0 for real sensors
+#ifndef ENABLE_HITL
+#define ENABLE_HITL 1
+#endif
+
+#if ENABLE_HITL
+#include "hitl.h"
+#endif
+
 #define SAMPLE_RATE_MS 10  // 1000 Hz
 #define SERVO_PIN 16
 #define SERVO_STEP_MS 1000
@@ -116,8 +125,14 @@ void setup() {
   s_servo.attach(SERVO_PIN, 500, 2400);
   stepServo();
 
+#if ENABLE_HITL
+  initHITL();
+  bool imuOk = true;
+  bool baroOk = true;
+#else
   bool imuOk = initIMU();
   bool baroOk = initBaro();
+#endif
   bool binOk = initBinLog();
 
   // Serial.printf("[MAIN] IMU init: %s\n", imuOk ? "OK" : "FAIL");
@@ -125,8 +140,8 @@ void setup() {
   // Serial.printf("[MAIN] BinLog init: %s\n", binOk ? "OK" : "FAIL");
   
   float h0 = 0;
-  
-  dt= 0.1f;   // 100Hz IMU rate (Can control to be loop rate)
+
+  dt = 0.1f;  // 100Hz IMU rate (Can control to be loop rate)
   ekf_init(&ekf, dt, h0);
 
   // if (!imuOk || !baroOk || !binOk) {
@@ -145,11 +160,17 @@ void setup() {
 void loop() {
   // loggingProfiler();
 
+#if ENABLE_HITL
+  updateHITL();
+  IMUData imu = readIMUHITL();
+  BaroData baro = readBaroHITL();
+#else
   IMUData imu = readIMU();
   BaroData baro = readBaro();
+#endif
   logSensorsBin(imu, baro);
   delay(SAMPLE_RATE_MS);
-  
+
   static uint32_t prev_ms = millis();
   uint32_t now = millis();
   dt = (now - prev_ms) / 1000.0f;
@@ -160,8 +181,8 @@ void loop() {
   float gyro_yaw = imu.gyroZ;     // rad/s
   float accel_vertical = imu.accelY - 9.81f;    // m/s^2
   // float accel_x = imu.accelX;    // m/s^2
-  float gyro_pitch = imu.gyroX;     // rad/s
-  float barometer_raw = baro.altitudeM + 42;   // metres
+  float gyro_pitch = imu.gyroX;               // rad/s
+  float barometer_raw = baro.altitudeM + 42;  // metres
 
   ekf_predict(&ekf, accel_vertical, gyro_pitch, gyro_yaw);
   // float barometer_raw = baro.altitudeM;   // metres
@@ -176,5 +197,7 @@ void loop() {
     ekf.x[1]
   );
   delay(100);
-  
+
+  Serial.printf("[SENSOR] Alt: %.2f m, Press: %.2f hPa, AccelY: %.2f m/s²\n",
+                baro.altitudeM, baro.pressureHPa, imu.accelY);
 }
