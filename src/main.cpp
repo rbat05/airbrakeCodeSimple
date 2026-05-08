@@ -7,6 +7,8 @@
 #include "imu.h"
 #include "ekf.h"
 
+#include "airbraketest.h"
+
 // Set to 1 to enable Hardware-In-The-Loop simulation, 0 for real sensors
 #ifndef ENABLE_HITL
 #define ENABLE_HITL 1
@@ -19,6 +21,8 @@
 #define SAMPLE_RATE_MS 10  // 1000 Hz
 #define SERVO_PIN 16
 #define SERVO_STEP_MS 1000
+
+#define AIRBRAKE_TEST 0
 
 static Servo s_servo;
 static int s_servoAngle = 0;
@@ -124,6 +128,13 @@ void setup() {
   s_servo.setPeriodHertz(50);
   s_servo.attach(SERVO_PIN, 500, 2400);
   stepServo();
+
+
+#if AIRBRAKE_TEST
+  RunAirbrakeSim();
+  while(1);
+#endif
+
 
 #if ENABLE_HITL
   initHITL();
