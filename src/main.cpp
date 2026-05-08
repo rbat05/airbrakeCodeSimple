@@ -2,15 +2,14 @@
 #include <ESP32Servo.h>
 #include <Wire.h>
 
-#include "baro.h"
-#include "hexdump.h"
-#include "imu.h"
-#include "ekf.h"
-
-#include "airbraketest.h"
 #include "Dynamics.h"
 #include "RocketVariables.h"
-
+#include "ServoController.h"
+#include "airbraketest.h"
+#include "baro.h"
+#include "ekf.h"
+#include "hexdump.h"
+#include "imu.h"
 
 // Set to 1 to enable Hardware-In-The-Loop simulation, 0 for real sensors
 #ifndef ENABLE_HITL
@@ -134,12 +133,10 @@ void setup() {
   s_servo.attach(SERVO_PIN, 500, 2400);
   stepServo();
 
-
 #if AIRBRAKE_TEST
   RunAirbrakeSim();
-  while(1);
+  while (1);
 #endif
-
 
 #if ENABLE_HITL
   initHITL();
@@ -154,7 +151,7 @@ void setup() {
   // Serial.printf("[MAIN] IMU init: %s\n", imuOk ? "OK" : "FAIL");
   // Serial.printf("[MAIN] Baro init: %s\n", baroOk ? "OK" : "FAIL");
   // Serial.printf("[MAIN] BinLog init: %s\n", binOk ? "OK" : "FAIL");
-  
+
   float h0 = 0;
 
   dt = 0.1f;  // 100Hz IMU rate (Can control to be loop rate)
@@ -191,11 +188,11 @@ void loop() {
   uint32_t now = millis();
   dt = (now - prev_ms) / 1000.0f;
   prev_ms = now;
-  //print all three accelerations and gyros to serial
-  //float accel_z = imu.accelZ;    // m/s^2
-  //float gyro_y = imu.gyroY;     // rad/s
-  float gyro_yaw = imu.gyroZ;     // rad/s
-  float accel_vertical = imu.accelY - 9.81f;    // m/s^2
+  // print all three accelerations and gyros to serial
+  // float accel_z = imu.accelZ;    // m/s^2
+  // float gyro_y = imu.gyroY;     // rad/s
+  float gyro_yaw = imu.gyroZ;                 // rad/s
+  float accel_vertical = imu.accelY - 9.81f;  // m/s^2
   // float accel_x = imu.accelX;    // m/s^2
   float gyro_pitch = imu.gyroX;               // rad/s
   float barometer_raw = baro.altitudeM + 42;  // metres
@@ -205,22 +202,17 @@ void loop() {
   ekf_update(&ekf, barometer_raw);
 
   if (ekf.x[0] > 100.0) {
-    u = OptimiseControlInputBinarySearchConstraint(ekf.x[0], ekf.x[1], u_prev, 0);
-    SetServoAngle(u);   // u = 0–180 degrees
-    u_prev = u; 
+    u = OptimiseControlInputBinarySearchConstraint(ekf.x[0], ekf.x[1], u_prev,
+                                                   0);
+    SetServoAngle(u);  // u = 0–180 degrees
+    u_prev = u;
     float h_pred = PredictApogee(ekf.x[0], ekf.x[1], u);
   }
 
-  Serial.printf(
-    "%lu,%.3f,%.3f,%.3f,%.3f\n",
-    millis(),
-    barometer_raw,
-    velocity,
-    ekf.x[0],
-    ekf.x[1]
-  );
+  Serial.printf("%lu,%.3f,%.3f,%.3f,%.3f\n", millis(), barometer_raw, velocity,
+                ekf.x[0], ekf.x[1]);
   delay(100);
 
-  Serial.printf("[SENSOR] Alt: %.2f m, Press: %.2f hPa, AccelY: %.2f m/s²\n",
-                baro.altitudeM, baro.pressureHPa, imu.accelY);
+  // Serial.printf("[SENSOR] Alt: %.2f m, Press: %.2f hPa, AccelY: %.2f m/s²\n",
+  //               baro.altitudeM, baro.pressureHPa, imu.accelY);
 }

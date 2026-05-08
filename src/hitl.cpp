@@ -42,6 +42,7 @@ void updateHITL() {
   if (!s_launched && millis() > 5000) {
     s_launched = true;
     Serial.println("[HITL] Auto-launching simulator!");
+    dt = 0.0f;  // Reset dt on launch to avoid large jump
   }
 
   if (dt <= 0.0f || !s_launched) {
