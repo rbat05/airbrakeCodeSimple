@@ -6,6 +6,15 @@
 #include "hexdump.h"
 #include "imu.h"
 
+// Set to 1 to enable Hardware-In-The-Loop simulation, 0 for real sensors
+#ifndef ENABLE_HITL
+#define ENABLE_HITL 1
+#endif
+
+#if ENABLE_HITL
+#include "hitl.h"
+#endif
+
 #define SAMPLE_RATE_MS 10  // 1000 Hz
 #define SERVO_PIN 16
 #define SERVO_STEP_MS 1000
@@ -111,8 +120,14 @@ void setup() {
   s_servo.attach(SERVO_PIN, 500, 2400);
   stepServo();
 
+#if ENABLE_HITL
+  initHITL();
+  bool imuOk = true;
+  bool baroOk = true;
+#else
   bool imuOk = initIMU();
   bool baroOk = initBaro();
+#endif
   bool binOk = initBinLog();
 
   Serial.printf("[MAIN] IMU init: %s\n", imuOk ? "OK" : "FAIL");
@@ -135,8 +150,17 @@ void setup() {
 void loop() {
   // loggingProfiler();
 
+#if ENABLE_HITL
+  updateHITL();
+  IMUData imu = readIMUHITL();
+  BaroData baro = readBaroHITL();
+#else
   IMUData imu = readIMU();
   BaroData baro = readBaro();
+#endif
   logSensorsBin(imu, baro);
   delay(SAMPLE_RATE_MS);
+
+  Serial.printf("[SENSOR] Alt: %.2f m, Press: %.2f hPa, AccelY: %.2f m/s²\n",
+                baro.altitudeM, baro.pressureHPa, imu.accelY);
 }
