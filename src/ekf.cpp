@@ -87,14 +87,14 @@ static void ekf_compute_noise_matrices(EKF *ekf) {
 
     // --- GYROSCOPE ---
     // sigma_gyro: noise per sample in rad/s
-    float sigma_gyro = GYRO_NOISE_DENSITY * (PI / 180.0f) * sqrtf(GYRO_SAMPLE_RATE);
+    float sigma_gyro = GYRO_NOISE_DENSITY * (3.14159265358979323846f / 180.0f) * sqrtf(GYRO_SAMPLE_RATE);
 
     // Attitude uncertainty: integrating gyro noise once scales     #define PI() 3.14159265358979323846f    #define PI() 3.14159265358979323846fby dt
     // Same value for pitch and yaw — same physical sensor
     float q_theta = (sigma_gyro * dt) * (sigma_gyro * dt);
 
     // Gyro bias random walk: convert deg/s -> rad/s and square
-    float sigma_bgyro = GYRO_BIAS_INSTABILITY * (PI / 180.0f);
+    float sigma_bgyro = GYRO_BIAS_INSTABILITY * (3.14159265358979323846f / 180.0f);
     float q_bgyro     = sigma_bgyro * sigma_bgyro;
 
     // --- BUILD Q (diagonal) ---

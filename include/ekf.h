@@ -27,7 +27,6 @@
 
 #define EKF_N 7       // number of states
 #define G     9.81f   // gravity (m/s^2)
-#define PI 3.14159265358979323846f // π constant (float)
 
 // ============================================================
 // SENSOR PARAMETERS — MPU-6050 + BME280
