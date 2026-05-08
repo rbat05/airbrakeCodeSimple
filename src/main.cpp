@@ -206,7 +206,7 @@ void loop() {
 
   if (ekf.x[0] > 100.0) {
     u = OptimiseControlInputBinarySearchConstraint(ekf.x[0], ekf.x[1], u_prev, 0);
-    // SetServoAngle(u);   // u = 0–180 degrees
+    SetServoAngle(u);   // u = 0–180 degrees
     u_prev = u; 
     float h_pred = PredictApogee(ekf.x[0], ekf.x[1], u);
   }
