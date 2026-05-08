@@ -5,6 +5,7 @@
 #include "baro.h"
 #include "hexdump.h"
 #include "imu.h"
+#include "ekf.h"
 
 // Set to 1 to enable Hardware-In-The-Loop simulation, 0 for real sensors
 #ifndef ENABLE_HITL
@@ -26,6 +27,10 @@ static uint32_t s_lastServoStepMs = 0;
 static uint32_t s_profileStartMs = 0;
 static uint32_t s_profileSamples = 0;
 static uint32_t s_imuTimeUs = 0, s_baroTimeUs = 0, s_logTimeUs = 0;
+
+float dt;
+EKF ekf;
+float velocity = 0;
 
 static void stepServo() {
   s_servo.write(s_servoAngle);
@@ -110,9 +115,9 @@ static void loggingProfiler() {
 void setup() {
   Serial.begin(115200);
   delay(500);  // let the monitor connect
-  Serial.println("\n[MAIN] ESP32 Sensor Logger");
-  Serial.println(
-      "[MAIN] Initialising I2C sensors on Wire (SDA=GPIO33, SCL=GPIO32)");
+  // Serial.println("\n[MAIN] ESP32 Sensor Logger");
+  // Serial.println(
+  //     "[MAIN] Initialising I2C sensors on Wire (SDA=GPIO33, SCL=GPIO32)");
 
   Wire.begin(33, 32);  // SDA=GPIO33, SCL=GPIO32
 
@@ -130,10 +135,10 @@ void setup() {
 #endif
   bool binOk = initBinLog();
 
-  Serial.printf("[MAIN] IMU init: %s\n", imuOk ? "OK" : "FAIL");
-  Serial.printf("[MAIN] Baro init: %s\n", baroOk ? "OK" : "FAIL");
-  Serial.printf("[MAIN] BinLog init: %s\n", binOk ? "OK" : "FAIL");
-
+  // Serial.printf("[MAIN] IMU init: %s\n", imuOk ? "OK" : "FAIL");
+  // Serial.printf("[MAIN] Baro init: %s\n", baroOk ? "OK" : "FAIL");
+  // Serial.printf("[MAIN] BinLog init: %s\n", binOk ? "OK" : "FAIL");
+  
   float h0 = 0;
 
   dt = 0.1f;  // 100Hz IMU rate (Can control to be loop rate)
@@ -148,8 +153,8 @@ void setup() {
   //   }
   // }
 
-  Serial.printf("[MAIN] Logging binary sensor data at %d Hz\n\n",
-                1000 / SAMPLE_RATE_MS);
+  // Serial.printf("[MAIN] Logging binary sensor data at %d Hz\n\n",
+  //               1000 / SAMPLE_RATE_MS);
 }
 
 void loop() {
@@ -170,11 +175,11 @@ void loop() {
   uint32_t now = millis();
   dt = (now - prev_ms) / 1000.0f;
   prev_ms = now;
-  // print all three accelerations and gyros to serial
-  // float accel_z = imu.accelZ;    // m/s^2
-  // float gyro_y = imu.gyroY;     // rad/s
-  float gyro_yaw = imu.gyroZ;                 // rad/s
-  float accel_vertical = imu.accelY - 9.81f;  // m/s^2
+  //print all three accelerations and gyros to serial
+  //float accel_z = imu.accelZ;    // m/s^2
+  //float gyro_y = imu.gyroY;     // rad/s
+  float gyro_yaw = imu.gyroZ;     // rad/s
+  float accel_vertical = imu.accelY - 9.81f;    // m/s^2
   // float accel_x = imu.accelX;    // m/s^2
   float gyro_pitch = imu.gyroX;               // rad/s
   float barometer_raw = baro.altitudeM + 42;  // metres
@@ -182,9 +187,15 @@ void loop() {
   ekf_predict(&ekf, accel_vertical, gyro_pitch, gyro_yaw);
   // float barometer_raw = baro.altitudeM;   // metres
   ekf_update(&ekf, barometer_raw);
-
-  Serial.printf("%lu,%.3f,%.3f,%.3f,%.3f\n", millis(), barometer_raw, velocity,
-                ekf.x[0], ekf.x[1]);
+  
+  Serial.printf(
+    "%lu,%.3f,%.3f,%.3f,%.3f\n",
+    millis(),
+    barometer_raw,
+    velocity,
+    ekf.x[0],
+    ekf.x[1]
+  );
   delay(100);
 
   Serial.printf("[SENSOR] Alt: %.2f m, Press: %.2f hPa, AccelY: %.2f m/s²\n",
