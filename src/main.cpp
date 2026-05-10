@@ -13,14 +13,14 @@
 
 // Set to 1 to enable Hardware-In-The-Loop simulation, 0 for real sensors
 #ifndef ENABLE_HITL
-#define ENABLE_HITL 0
+#define ENABLE_HITL 1
 #endif
 
 #if ENABLE_HITL
 #include "hitl.h"
 #endif
 
-#define SAMPLE_RATE_MS 10  // 1000 Hz
+#define SAMPLE_RATE_MS 10  // 100 Hz
 #define SERVO_PIN 16
 #define SERVO_STEP_MS 1000
 
@@ -41,14 +41,12 @@ float u_prev = 0.0;
 float u = 0.0;
 float h_pred = 0.0;
 
-float gyro_yaw;                 // rad/s
+float gyro_yaw;        // rad/s
 float accel_vertical;  // m/s^2
-float gyro_pitch;               // rad/s
-float barometer_raw;  // metres
+float gyro_pitch;      // rad/s
+float barometer_raw;   // metres
 
 int loop_count = 0;
-
-
 
 static void stepServo() {
   s_servo.write(s_servoAngle);
@@ -106,7 +104,7 @@ void setup() {
 
 void loop() {
   // loggingProfiler();
-    loop_count++;
+  loop_count++;
 #if ENABLE_HITL
   updateHITL();
   IMUData imu = readIMUHITL();
@@ -133,36 +131,35 @@ void loop() {
   ekf_predict(&ekf, accel_vertical, gyro_pitch, gyro_yaw);
 
   if (loop_count == 4) {
-     barometer_raw = baro.altitudeM;  // metres
-     ekf_update(&ekf, barometer_raw);
-     loop_count = 0;
-     
+    barometer_raw = baro.altitudeM;  // metres
+    ekf_update(&ekf, barometer_raw);
+    loop_count = 0;
+
     Serial.printf("%lu,%.3f,%.3f,%.3f,%.3f\n", millis(), barometer_raw,
-    velocity, ekf.x[0], ekf.x[1]);
-  }
- 
-
-  // float barometer_raw = baro.altitudeM;   // metres
-  if (ekf.x[0] > 100.0) {
-    u = OptimiseControlInputBinarySearchConstraint(ekf.x[0], velocity, u_prev,
-                                                   0);
-    SetServoAngle(u);  // u = 0–180 degrees
-
-    // Note: h_pred and u are only calculated when the EKF altitude estimate is
-    // above 100m, h_pred is predicted apogee, u is servo command
-
-    u_prev = u;
-    h_pred = PredictApogee(ekf.x[0], velocity, u);
+                  velocity, ekf.x[0], ekf.x[1]);
   }
 
-  ModelData modelData = setModelData(h_pred, u);
+  // // float barometer_raw = baro.altitudeM;   // metres
+  // if (ekf.x[0] > 100.0) {
+  //   u = OptimiseControlInputBinarySearchConstraint(ekf.x[0], velocity,
+  //   u_prev,
+  //                                                  0);
+  //   SetServoAngle(u);  // u = 0–180 degrees
 
-  logSensorsBin(imu, baro, modelData);
+  //   // Note: h_pred and u are only calculated when the EKF altitude estimate
+  //   is
+  //   // above 100m, h_pred is predicted apogee, u is servo command
+
+  //   u_prev = u;
+  //   h_pred = PredictApogee(ekf.x[0], velocity, u);
+  // }
+
+  // ModelData modelData = setModelData(h_pred, u);
+
+  // logSensorsBin(imu, baro, modelData);
 
   delay(SAMPLE_RATE_MS);
 
-
- 
   // delay(100);
 
   // Serial.printf("[SENSOR] Alt: %.2f m, Press: %.2f hPa, AccelY: %.2f m/s²\n",

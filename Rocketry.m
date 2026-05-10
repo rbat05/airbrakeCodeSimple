@@ -5,7 +5,7 @@
 % ============================================================
 
 % --- Setup serial ---
-s = serialport("COM5", 115200);
+s = serialport("/dev/ttyUSB0", 115200); % Linux version
 configureTerminator(s, "LF");
 flush(s);
 
