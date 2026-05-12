@@ -127,14 +127,14 @@ void loop() {
   accel_vertical = imu.accelY - 9.81f;  // m/s^2
   gyro_pitch = imu.gyroX;               // rad/s
 
-  velocity += accel_vertical * dt;
-  ekf_predict(&ekf, accel_vertical, gyro_pitch, gyro_yaw);
-
+  velocity += accel_vertical * dt; // Raw Velocity estimate
+  ekf_predict(&ekf, accel_vertical, gyro_pitch, gyro_yaw); // Predicts height from IMU
+  // Can log predicted ekf here as wel (ekf.x{0}, ekf.x{1}, etc)
   if (loop_count == 4) {
-    barometer_raw = baro.altitudeM;  // metres
-    ekf_update(&ekf, barometer_raw);
+    barometer_raw = baro.altitudeM;  // metres (Raw barometer estimate)
+    ekf_update(&ekf, barometer_raw); // Corrects prediction of height from IMU from barometer reading
     loop_count = 0;
-
+    // log ekf.x[0] & ekf.x[1] (estimated height and velocity)
     Serial.printf("%lu,%.3f,%.3f,%.3f,%.3f\n", millis(), barometer_raw,
                   velocity, ekf.x[0], ekf.x[1]);
   }
@@ -157,6 +157,7 @@ void loop() {
   // ModelData modelData = setModelData(h_pred, u);
 
   // logSensorsBin(imu, baro, modelData);
+
 
   delay(SAMPLE_RATE_MS);
 
