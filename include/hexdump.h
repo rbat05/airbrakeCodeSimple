@@ -3,6 +3,7 @@
 
 #include "Dynamics.h"
 #include "baro.h"
+#include "ekf.h"
 #include "imu.h"
 
 // ── On-disk record layout (54 bytes, packed)
@@ -19,13 +20,14 @@
 //  24      4     float   gyroZ
 //  28      4     float   pressureHPa
 //  32      4     float   altitudeM
-//  36      4     float   altitudeKalmanM
-//  40      4     float   velocityKalmanMps
-//  44      4     float   predictedApogeeM
-//  48      4     float   servoCommand
-//  52      2     uint16  crc16  (covers bytes 0-51)
+//  36      4     float   filteredHeight
+//  40      4     float   filteredVelocity
+//  44      4     float   imuVelocityPrediction
+//  48      4     float   predictedApogeeM
+//  52      4     float   servoCommand
+//  56      2     uint16  crc16  (covers bytes 0-55)
 //  ──────  ────
-//  Total: 54 bytes per record
+//  Total: 58 bytes per record
 //
 // File starts with a 4-byte magic number: 0xDEAD 0xBEEF
 // followed by a 2-byte record size (54) for forward-compat.
@@ -37,15 +39,16 @@ struct BinRecord {
   float accelX, accelY, accelZ;
   float gyroX, gyroY, gyroZ;
   float pressureHPa, altitudeM;
-  float altitudeKalmanM;
-  float velocityKalmanMps;
+  float filteredHeight;
+  float filteredVelocity;
+  float imuVelocityPrediction;
   float predictedApogeeM;
   float servoCommand;
   uint16_t crc16;
 };
 #pragma pack(pop)
 
-static_assert(sizeof(BinRecord) == 54, "BinRecord size mismatch");
+static_assert(sizeof(BinRecord) == 58, "BinRecord size mismatch");
 
 bool initBinLog();
 void logSensorsBin(const IMUData& imu, const BaroData& baro,

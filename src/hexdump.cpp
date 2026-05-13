@@ -109,7 +109,7 @@ bool initBinLog() {
 }
 
 void logSensorsBin(const IMUData& imu, const BaroData& baro,
-                   const ModelData& modelData) {
+                   const ModelData& modelData, const EKFData& ekfData) {
   if (!s_ready) return;
 
   BinRecord& r = s_buf[s_count];
@@ -126,8 +126,11 @@ void logSensorsBin(const IMUData& imu, const BaroData& baro,
   // TODO(control): Replace these placeholders with live estimator/controller
   // outputs.
   // r.velocityBeforeKalman = 0.0f; // Integration of accelY over time
-  r.altitudeKalmanM = 0.0f;
-  r.velocityKalmanMps = 0.0f;
+  r.filteredHeight = ekfData.filtered_height;
+  r.filteredVelocity = ekfData.filtered_velocity;
+  r.imuVelocityPrediction =
+      ekfData.imu_velocity_prediction;  // Integration of accelY over time
+                                        // without Kalman correction
   r.predictedApogeeM = modelData.predictedApogeeM;
   r.servoCommand = modelData.servoCommand;
 
