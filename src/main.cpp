@@ -64,9 +64,9 @@ static void stepServo() {
 void setup() {
   Serial.begin(115200);
   delay(500);  // let the monitor connect
-  // Serial.println("\n[MAIN] ESP32 Sensor Logger");
-  // Serial.println(
-  //     "[MAIN] Initialising I2C sensors on Wire (SDA=GPIO33, SCL=GPIO32)");
+  Serial.println("\n[MAIN] ESP32 Sensor Logger");
+  Serial.println(
+      "[MAIN] Initialising I2C sensors on Wire (SDA=GPIO33, SCL=GPIO32)");
 
   Wire.begin(33, 32);  // SDA=GPIO33, SCL=GPIO32
 
@@ -98,12 +98,11 @@ void setup() {
   dt = 0.01f;  // 100Hz IMU rate (Can control to be loop rate)
   ekf_init(&ekf, dt, h0);
 
-  // Serial.printf("[MAIN] Logging binary sensor data at %d Hz\n\n",
-  //               1000 / SAMPLE_RATE_MS);
+  Serial.printf("[MAIN] Logging binary sensor data at %d Hz\n\n",
+                1000 / SAMPLE_RATE_MS);
 }
 
 void loop() {
-  // loggingProfiler();
   loop_count++;
 #if ENABLE_HITL
   updateHITL();
@@ -114,15 +113,12 @@ void loop() {
   BaroData baro = readBaro();
 #endif
 
-  // MPU Alignment Code
-  // printIMU();
-
+  // EKF STEP
   static uint32_t prev_ms = millis();
   uint32_t now = millis();
   dt = (now - prev_ms) / 1000.0f;
   prev_ms = now;
 
-  // print all three accelerations and gyros to serial
   gyro_yaw = imu.gyroZ;                 // rad/s
   accel_vertical = imu.accelY - 9.81f;  // m/s^2
   gyro_pitch = imu.gyroX;               // rad/s
@@ -130,44 +126,41 @@ void loop() {
   velocity += accel_vertical * dt;  // Raw Velocity estimate
   ekf_predict(&ekf, accel_vertical, gyro_pitch,
               gyro_yaw);  // Predicts height from IMU
-  // Can log predicted ekf here as wel (ekf.x{0}, ekf.x{1}, etc)
   if (loop_count == 4) {
     barometer_raw = baro.altitudeM;   // metres (Raw barometer estimate)
     ekf_update(&ekf, barometer_raw);  // Corrects prediction of height from IMU
                                       // from barometer reading
     loop_count = 0;
-    // log ekf.x[0] & ekf.x[1] (estimated height and velocity)
-    Serial.printf("%lu,%.3f,%.3f,%.3f,%.3f\n", millis(), barometer_raw,
-                  velocity, ekf.x[0], ekf.x[1]);
   }
 
-  EKFData ekfData;
-  // FORMAT: FILTERED HEIGHT, FILTERED VELOCITY, IMU-ONLY VELOCITY
-  setEKFData(ekf.x[0], ekf.x[1], velocity);
+  // Serial.printf(
+  //     "EKF Height: %.2f m, EKF Velocity: %.2f m/s, IMU Velocity: %.2f m/s, "
+  //     "Baro Altitude: %.2f m\n",
+  //     ekf.x[0], ekf.x[1], velocity, barometer_raw);
 
-  // // float barometer_raw = baro.altitudeM;   // metres
-  // if (ekf.x[0] > 100.0) {
-  //   u = OptimiseControlInputBinarySearchConstraint(ekf.x[0], velocity,
-  //   u_prev,
-  //                                                  0);
-  //   SetServoAngle(u);  // u = 0–180 degrees
+  EKFData ekfData = setEKFData(ekf.x[0], ekf.x[1], velocity);
 
-  //   // Note: h_pred and u are only calculated when the EKF altitude estimate
-  //   is
-  //   // above 100m, h_pred is predicted apogee, u is servo command
+  // MPC STEP
+  // Only activate airbrakes when above 100m altitude
+  if (ekf.x[0] > 100.0) {
+    u = OptimiseControlInputBinarySearchConstraint(ekf.x[0], velocity, u_prev,
+                                                   0);
+    SetServoAngle(u);  // u = 0–180 degrees
 
-  //   u_prev = u;
-  //   h_pred = PredictApogee(ekf.x[0], velocity, u);
-  // }
+    // u: servo command
+    // h_pred: predicted apogee from EKF state and current control input
 
-  // ModelData modelData = setModelData(h_pred, u);
+    u_prev = u;
+    h_pred = PredictApogee(ekf.x[0], velocity, u);
+  }
 
-  // logSensorsBin(imu, baro, modelData, ekfData);
+  // Serial.printf(
+  //     "Servo Command: %.2f degrees, "
+  //     "Predicted Apogee: %.2f m\n",
+  //     u, h_pred);
 
-  delay(SAMPLE_RATE_MS);
+  ModelData modelData = setModelData(h_pred, u);
+  logSensorsBin(imu, baro, modelData, ekfData);
 
-  // delay(100);
-
-  // Serial.printf("[SENSOR] Alt: %.2f m, Press: %.2f hPa, AccelY: %.2f m/s²\n",
-  //               baro.altitudeM, baro.pressureHPa, imu.accelY);
+  // delay(SAMPLE_RATE_MS);
 }

@@ -334,10 +334,11 @@ float ekf_get_b_gyro_p(EKF* ekf) { return ekf->x[4]; }
 float ekf_get_b_gyro_y(EKF* ekf) { return ekf->x[5]; }
 float ekf_get_b_acc(EKF* ekf) { return ekf->x[6]; }
 
-void setEKFData(float filtered_height, float filtered_velocity,
-                float imu_velocity_prediction) {
+EKFData setEKFData(float filtered_height, float filtered_velocity,
+                   float imu_velocity_prediction) {
   EKFData d;
   d.filtered_height = filtered_height;
   d.filtered_velocity = filtered_velocity;
   d.imu_velocity_prediction = imu_velocity_prediction;
+  return d;
 }

@@ -16,7 +16,7 @@
 // 54 bytes = 5 400 bytes per flush. SD cards prefer writes in multiples of the
 // sector size (512 B). 5 400 B = ~10.5 sectors — close enough; tweak
 // BUFFER_RECORDS to taste.
-#define BUFFER_RECORDS 25
+#define BUFFER_RECORDS 100
 
 // File header
 static const uint8_t FILE_MAGIC[4] = {0xDE, 0xAD, 0xBE, 0xEF};
@@ -140,6 +140,8 @@ void logSensorsBin(const IMUData& imu, const BaroData& baro,
   s_count++;
 
   if (s_count >= BUFFER_RECORDS) flushBuffer();
+
+  printBinRecord(r);  // TEMP
 }
 
 void flushBinLog() {
@@ -147,4 +149,16 @@ void flushBinLog() {
     Serial.printf("[BIN] Force-flushing %u records\n", s_count);
     flushBuffer();
   }
+}
+
+void printBinRecord(const BinRecord& r) {
+  Serial.printf(
+      "Timestamp: %lu ms, Accel: (%.2f, %.2f, %.2f) m/s², Gyro: (%.2f, "
+      "%.2f, %.2f) °/s, Pressure: %.2f hPa, Altitude: %.2f m, Filtered "
+      "Height: %.2f m, Filtered Velocity: %.2f m/s, IMU Velocity Prediction: "
+      "%.2f m/s, Predicted Apogee: %.2f m, Servo Command: %.2f degrees, CRC16: "
+      "0x%04X\n",
+      r.timestamp_ms, r.accelX, r.accelY, r.accelZ, r.gyroX, r.gyroY, r.gyroZ,
+      r.pressureHPa, r.altitudeM, r.filteredHeight, r.filteredVelocity,
+      r.imuVelocityPrediction, r.predictedApogeeM, r.servoCommand, r.crc16);
 }

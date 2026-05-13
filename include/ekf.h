@@ -68,8 +68,8 @@ struct EKFData {
   float imu_velocity_prediction;
 };
 
-void setEKFData(float filtered_height, float filtered_velocity,
-                float imu_velocity_prediction);
+EKFData setEKFData(float filtered_height, float filtered_velocity,
+                   float imu_velocity_prediction);
 
 // ============================================================
 // PUBLIC FUNCTION DECLARATIONS

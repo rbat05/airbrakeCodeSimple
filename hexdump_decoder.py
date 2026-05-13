@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-decode_log.py — decode datalog_###.bin produced by the binary logger
+hexdump_decoder.py — decode datalog_###.bin produced by the binary logger
 
 Usage:
-    python decode_log.py datalog_000.bin          # print to stdout
-    python decode_log.py datalog_000.bin -o out.csv   # save as CSV
-    python decode_log.py datalog_000.bin --plot   # quick matplotlib preview
+    python hexdump_decoder.py datalog_000.bin          # print to stdout
+    python hexdump_decoder.py datalog_000.bin -o out.csv   # save as CSV
+    python hexdump_decoder.py datalog_000.bin --plot   # quick matplotlib preview
 """
 
 import struct
@@ -17,15 +17,16 @@ from pathlib import Path
 # ── Constants ──────────────────────────────────────────────────────────────────
 MAGIC           = bytes([0xDE, 0xAD, 0xBE, 0xEF])
 HEADER_SIZE     = 6          # 4-byte magic + 2-byte record size
-RECORD_FMT      = "<IffffffffffffH"   # little-endian: uint32, 12× float, uint16
-RECORD_SIZE_EXP = struct.calcsize(RECORD_FMT)   # should be 54
+RECORD_FMT      = "<IfffffffffffffH"   # little-endian: uint32, 13× float, uint16
+RECORD_SIZE_EXP = struct.calcsize(RECORD_FMT)   # should be 58
 
 FIELDS = [
     "timestamp_ms",
     "accelX", "accelY", "accelZ",
     "gyroX",  "gyroY",  "gyroZ",
     "pressureHPa", "altitudeM",
-    "altitudeKalmanM", "velocityKalmanMps",
+    "filteredHeight", "filteredVelocity",
+    "imuVelocityPrediction",
     "predictedApogeeM", "servoCommand",
     "crc16",
 ]
@@ -97,7 +98,7 @@ def print_table(records: list[dict]) -> None:
     header = (
         f"{'ms':>10}  {'aX':>8} {'aY':>8} {'aZ':>8}  "
         f"{'gX':>8} {'gY':>8} {'gZ':>8}  "
-        f"{'hPa':>8} {'alt':>7} {'kAlt':>8} {'kVel':>8} {'apogee':>8} {'servo':>8}"
+        f"{'hPa':>8} {'alt':>7} {'filtH':>8} {'filtV':>8} {'imuV':>8} {'apogee':>8} {'servo':>8}"
     )
     print(header)
     print("─" * len(header))
@@ -107,8 +108,8 @@ def print_table(records: list[dict]) -> None:
             f"{r['accelX']:>8.4f} {r['accelY']:>8.4f} {r['accelZ']:>8.4f}  "
             f"{r['gyroX']:>8.4f} {r['gyroY']:>8.4f} {r['gyroZ']:>8.4f}  "
             f"{r['pressureHPa']:>8.2f} {r['altitudeM']:>7.2f} "
-            f"{r['altitudeKalmanM']:>8.2f} {r['velocityKalmanMps']:>8.2f} "
-            f"{r['predictedApogeeM']:>8.2f} {r['servoCommand']:>8.2f}"
+            f"{r['filteredHeight']:>8.2f} {r['filteredVelocity']:>8.2f} "
+            f"{r['imuVelocityPrediction']:>8.2f} {r['predictedApogeeM']:>8.2f} {r['servoCommand']:>8.2f}"
         )
 
 
@@ -132,32 +133,43 @@ def plot(records: list[dict]) -> None:
 
     t  = [r["timestamp_ms"] / 1000.0 for r in records]   # seconds
 
-    fig, axes = plt.subplots(3, 1, figsize=(12, 9), sharex=True)
+    fig, axes = plt.subplots(4, 1, figsize=(12, 12), sharex=True)
 
-    axes[0].plot(t, [r["accelX"] for r in records], label="aX")
-    axes[0].plot(t, [r["accelY"] for r in records], label="aY")
-    axes[0].plot(t, [r["accelZ"] for r in records], label="aZ")
-    axes[0].set_ylabel("Accel (m/s²)")
+    # 1. Height vs Time
+    axes[0].plot(t, [r["altitudeM"] for r in records], label="Raw Baro Alt", alpha=0.6)
+    axes[0].plot(t, [r["filteredHeight"] for r in records], label="Filtered Alt (EKF)", linewidth=2)
+    axes[0].plot(t, [r["predictedApogeeM"] for r in records], label="Pred Apogee", linestyle="--")
+    axes[0].set_ylabel("Height (m)")
+    axes[0].set_title("Altitude & Apogee Prediction")
     axes[0].legend(loc="upper right")
     axes[0].grid(True)
 
-    axes[1].plot(t, [r["gyroX"] for r in records], label="gX")
-    axes[1].plot(t, [r["gyroY"] for r in records], label="gY")
-    axes[1].plot(t, [r["gyroZ"] for r in records], label="gZ")
-    axes[1].set_ylabel("Gyro (°/s)")
+    # 2. Velocity vs Time
+    axes[1].plot(t, [r["filteredVelocity"] for r in records], label="Filtered Vel (EKF)", linewidth=2)
+    axes[1].plot(t, [r["imuVelocityPrediction"] for r in records], label="IMU Vel Pred", linestyle="--", alpha=0.8)
+    axes[1].set_ylabel("Velocity (m/s)")
+    axes[1].set_title("Vertical Velocity")
     axes[1].legend(loc="upper right")
     axes[1].grid(True)
 
-    ax3 = axes[2]
-    ax3.plot(t, [r["pressureHPa"] for r in records], color="tab:blue",  label="hPa")
-    ax3.set_ylabel("Pressure (hPa)", color="tab:blue")
-    ax3b = ax3.twinx()
-    ax3b.plot(t, [r["altitudeM"] for r in records], color="tab:orange", label="alt")
-    ax3b.set_ylabel("Altitude (m)", color="tab:orange")
-    ax3.set_xlabel("Time (s)")
-    ax3.grid(True)
+    # 3. Acceleration vs Time
+    axes[2].plot(t, [r["accelX"] for r in records], label="aX", alpha=0.7)
+    axes[2].plot(t, [r["accelY"] for r in records], label="aY (Vertical)", linewidth=2)
+    axes[2].plot(t, [r["accelZ"] for r in records], label="aZ", alpha=0.7)
+    axes[2].set_ylabel("Accel (m/s²)")
+    axes[2].set_title("IMU Acceleration")
+    axes[2].legend(loc="upper right")
+    axes[2].grid(True)
 
-    fig.suptitle("ESP32 Sensor Log")
+    # 4. Servo Command vs Time
+    axes[3].step(t, [r["servoCommand"] for r in records], label="Servo Angle", color="purple", where="post")
+    axes[3].set_ylabel("Angle (°)")
+    axes[3].set_xlabel("Time (s)")
+    axes[3].set_title("Airbrake Servo Command")
+    axes[3].legend(loc="upper right")
+    axes[3].grid(True)
+
+    fig.suptitle("Rocket Flight Data Log Visualization", fontsize=16)
     plt.tight_layout()
     plt.show()
 

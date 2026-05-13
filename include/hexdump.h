@@ -52,5 +52,6 @@ static_assert(sizeof(BinRecord) == 58, "BinRecord size mismatch");
 
 bool initBinLog();
 void logSensorsBin(const IMUData& imu, const BaroData& baro,
-                   const ModelData& modelData);
+                   const ModelData& modelData, const EKFData& ekfData);
 void flushBinLog();
+void printBinRecord(const BinRecord& r);
