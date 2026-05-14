@@ -141,7 +141,7 @@ void logSensorsBin(const IMUData& imu, const BaroData& baro,
 
   if (s_count >= BUFFER_RECORDS) flushBuffer();
 
-  printBinRecord(r);  // TEMP
+  // printBinRecord(r);  // TEMP
 }
 
 void flushBinLog() {

@@ -38,8 +38,8 @@ void updateHITL() {
   float dt = (now - s_lastUpdateUs) / 1000000.0f;
   s_lastUpdateUs = now;
 
-  // Auto-launch after 5 seconds to simulate pre-launch pad time
-  if (!s_launched && millis() > 5000) {
+  // Auto-launch after 60 seconds to simulate pre-launch pad time
+  if (!s_launched && millis() > 60000) {
     s_launched = true;
     Serial.println("[HITL] Auto-launching simulator!");
     dt = 0.0f;  // Reset dt on launch to avoid large jump
@@ -75,6 +75,12 @@ void updateHITL() {
 
   // Acceleration
   s_a = net_force / mass;
+
+  // Post-apogee parachute descent
+  if (s_v < 0 && s_y > 0) {
+    s_a = 0.0f;   // No longer accelerating
+    s_v = -5.0f;  // Constant 5m/s descent rate under parachute
+  }
 
   // Update velocity and position
   if (s_y >= 0.0f || s_a > 0.0f) {

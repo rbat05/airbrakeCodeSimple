@@ -162,5 +162,12 @@ void loop() {
   ModelData modelData = setModelData(h_pred, u);
   logSensorsBin(imu, baro, modelData, ekfData);
 
-  // delay(SAMPLE_RATE_MS);
+  // Serial.printf(
+  //     "Baro Alt: %.2f m, EKF Height: %.2f m, EKF Velocity: %.2f m/s, IMU
+  //     Vel:"
+  //     "%.2f m/s, Servo Cmd: %.2f deg, Pred Apogee: %.2f m\n",
+  //     barometer_raw, ekf.x[0], ekf.x[1], velocity, u, h_pred);
+
+  delay(SAMPLE_RATE_MS);  // Do not remove, fucks up the timing and EKF
+                          // convergence
 }
