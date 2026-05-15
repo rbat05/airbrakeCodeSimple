@@ -5,29 +5,17 @@
 #include "Dynamics.h"
 #include "RocketVariables.h"
 #include "ServoController.h"
-#include "airbraketest.h"
 #include "baro.h"
 #include "ekf.h"
 #include "hexdump.h"
 #include "imu.h"
-#include "loop_timer.h"  // ← add this
-
-#ifndef ENABLE_HITL
-#define ENABLE_HITL 0
-#endif
-#if ENABLE_HITL
-#include "hitl.h"
-#endif
 
 #define SAMPLE_RATE_MS 10  // 50 Hz
 #define SERVO_PIN 16
-#define AIRBRAKE_TEST 0
 
 // ── Print loop stats every N iterations
 // ───────────────────────────────────────
 #define STATS_EVERY 0  // ~2 s at 50 Hz; set 0 to disable
-
-static LoopTimer loopTimer(SAMPLE_RATE_MS);
 
 static Servo s_servo;
 EKF ekf;
@@ -67,18 +55,8 @@ void setup() {
 
   ServoInit();
 
-#if AIRBRAKE_TEST
-  RunAirbrakeSim();
-  while (1);
-#endif
-
-#if ENABLE_HITL
-  initHITL();
-  bool imuOk = true, baroOk = true;
-#else
   bool imuOk = initIMU();
   bool baroOk = initBaro();
-#endif
   bool binOk = initBinLog();
 
   Serial.printf("[MAIN] IMU: %s  BARO: %s  BinLog: %s\n", imuOk ? "OK" : "FAIL",
@@ -109,19 +87,13 @@ void setup() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 void loop() {
-  // ── Timing: measure real dt, sleep remaining budget at the bottom ─────────
-  dt = loopTimer.tick();  // real dt in seconds; replaces millis() arithmetic
+  uint32_t loop_start = millis();
+  dt = SAMPLE_RATE_MS / 1000.0f;  // Fixed dt for EKF/integration
   loop_count++;
 
   // ── Sensor reads ──────────────────────────────────────────────────────────
-#if ENABLE_HITL
-  updateHITL();
-  IMUData imu = readIMUHITL();
-  BaroData baro = readBaroHITL();
-#else
   IMUData imu = readIMU();
   BaroData baro = readBaro();
-#endif
 
   // ── EKF ───────────────────────────────────────────────────────────────────
   gyro_yaw = imu.gyroZ;
@@ -184,15 +156,14 @@ void loop() {
 
   // ── Periodic stats print ──────────────────────────────────────────────────
 #if STATS_EVERY > 0
-  if (loop_count % STATS_EVERY == 1) {
-    LoopStats s = loopTimer.stats();
-    Serial.printf(
-        "[LOOP] dt: %.2f ms | busy: %.2f ms | avg busy: %.2f ms | "
-        "max busy: %.2f ms | overruns: %lu\n",
-        s.dt_ms, s.busy_ms, s.avg_busy_ms, s.max_busy_ms, s.overruns);
+  if (loop_count % STATS_EVERY == 0) {
+    Serial.printf("[LOOP] Heartbeat tick %d\n", loop_count);
   }
 #endif
 
   // ── Sleep remaining budget to hit target rate ─────────────────────────────
-  loopTimer.sleep();  // replaces delay(SAMPLE_RATE_MS)
+  uint32_t elapsed = millis() - loop_start;
+  if (elapsed < SAMPLE_RATE_MS) {
+    delay(SAMPLE_RATE_MS - elapsed);
+  }
 }
