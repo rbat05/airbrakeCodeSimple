@@ -39,6 +39,25 @@ float h_pred = 0.0f;
 float gyro_yaw, accel_vertical, gyro_pitch, barometer_raw;
 int loop_count = 0;
 
+// ── FreeRTOS Dual-Core Logging ──────────────────────────────────────────────
+struct LogMessage {
+  IMUData imu;
+  BaroData baro;
+  ModelData modelInfo;
+  EKFData ekf;
+};
+
+static QueueHandle_t logQueue = NULL;
+
+static void sdLoggingTask(void* pvParameters) {
+  LogMessage msg;
+  while (true) {
+    // Block indefinitely until a message arrives in the queue
+    if (xQueueReceive(logQueue, &msg, portMAX_DELAY) == pdPASS) {
+      logSensorsBin(msg.imu, msg.baro, msg.modelInfo, msg.ekf);
+    }
+  }
+}
 // ─────────────────────────────────────────────────────────────────────────────
 void setup() {
   Serial.begin(115200);
@@ -68,6 +87,24 @@ void setup() {
   ekf_init(&ekf, SAMPLE_RATE_MS / 1000.0f, 0.0f);
   Serial.printf("[MAIN] Target loop: %d ms (%d Hz)\n\n", SAMPLE_RATE_MS,
                 1000 / SAMPLE_RATE_MS);
+
+  // Initialize the queue to hold 100 loops worth of data (1 second buffer at
+  // 100Hz)
+  logQueue = xQueueCreate(100, sizeof(LogMessage));
+  if (logQueue != NULL) {
+    // Arduino loop() runs on Core 1 by default, so we pin logging to Core 0
+    xTaskCreatePinnedToCore(sdLoggingTask,  // Task function
+                            "SDLogTask",    // Task name
+                            8192,           // Stack size allowed
+                            NULL,           // Parameters
+                            1,              // Priority (low)
+                            NULL,           // Task handle
+                            0               // Run on Core 0
+    );
+    Serial.println("[MAIN] Dual-Core SD Logging task running on Core 0");
+  } else {
+    Serial.println("[MAIN] ERROR: Could not create log queue!");
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -112,7 +149,14 @@ void loop() {
   }
 
   ModelData modelData = setModelData(h_pred, u);
-  logSensorsBin(imu, baro, modelData, ekfData);
+
+  // Package data into struct and send to Core 0 (non-blocking)
+  if (logQueue != NULL) {
+    LogMessage msg = {imu, baro, modelData, ekfData};
+    // 0 timeout ensures if the queue fills up, the main loop drops the frame
+    // rather than crashing/stalling
+    xQueueSend(logQueue, &msg, 0);
+  }
 
   // ── Periodic stats print ──────────────────────────────────────────────────
 #if STATS_EVERY > 0
