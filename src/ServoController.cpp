@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include "ServoController.h"
+#include "Dynamics.h"
 
 
 // ===== CONFIG =====
@@ -16,12 +17,6 @@
 #define SERVO_MAX_US 2500
 
 
-#define GEAR_RATIO 1.8
-#define START_ANGLE 9.0
-
-
-
-
 static float clampf(float x, float a, float b) {
    return (x < a) ? a : (x > b) ? b : x;
 }
@@ -30,7 +25,6 @@ static float clampf(float x, float a, float b) {
 // Convert angle → pulse width
 static uint32_t angleToPulse(float angle) {
    angle = clampf(angle, 0.0f, 180.0f);
-
 
    return (uint32_t)(
        SERVO_MIN_US +
@@ -42,10 +36,8 @@ static uint32_t angleToPulse(float angle) {
 // ===== INIT =====
 void ServoInit() {
 
-
    ledcSetup(SERVO_CHANNEL, SERVO_FREQ, SERVO_RESOLUTION);
    ledcAttachPin(SERVO_PIN, SERVO_CHANNEL);
-
 
    // safe start position
    SetServoAngle(START_ANGLE);
@@ -54,17 +46,15 @@ void ServoInit() {
 
 // ===== SET ANGLE =====
 void SetServoAngle(float angle_deg) {
-
-
- float actuate_angle = START_ANGLE + angle_deg * GEAR_RATIO;
- uint32_t pulse = angleToPulse(angle_deg);
- SetServoPulseUs(pulse);
+   angle_deg = MAX(0.0,MIN(70.0,angle_deg));
+   float actuate_angle = START_ANGLE + (END_ANGLE - START_ANGLE)/70.0*angle_deg;
+   uint32_t pulse = angleToPulse(angle_deg);
+   SetServoPulseUs(pulse);
 }
 
 
 // ===== LOW LEVEL =====
 void SetServoPulseUs(uint32_t pulse_us) {
-
 
    // Convert microseconds → duty cycle
    const uint32_t maxDuty = (1 << SERVO_RESOLUTION) - 1;

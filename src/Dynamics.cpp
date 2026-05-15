@@ -61,10 +61,12 @@ float PredictApogee(float h_sim_predict, float v_sim_predict, float u) {
   float h_burnout = 120.0f;
   float h_final = href;
 
-  float dt = (predict_dt - predict_dt_final) / (h_burnout - h_final) *
-                 (h_sim_predict - h_burnout) +
-             predict_dt;
-  dt = MIN(predict_dt, MAX(dt, predict_dt_final));
+  // float dt = (predict_dt - predict_dt_final) / (h_burnout - h_final) *
+  //                (h_sim_predict - h_burnout) +
+  //            predict_dt;
+  // dt = MIN(predict_dt, MAX(dt, predict_dt_final));
+
+  float dt = 0.05;
 
   // dt   // slightly bigger for speed - smaller more accurate - doesnt have to
   // be same as control loop
