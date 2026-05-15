@@ -16,7 +16,7 @@
 // 54 bytes = 5 400 bytes per flush. SD cards prefer writes in multiples of the
 // sector size (512 B). 5 400 B = ~10.5 sectors — close enough; tweak
 // BUFFER_RECORDS to taste.
-#define BUFFER_RECORDS 100
+#define BUFFER_RECORDS 512
 
 // File header
 static const uint8_t FILE_MAGIC[4] = {0xDE, 0xAD, 0xBE, 0xEF};

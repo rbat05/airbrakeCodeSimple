@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Loop Timing Report — 10ms25flush.txt</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Courier New', monospace; background: #0e0e0e; color: #d4d4d4; padding: 2rem; }
+  h1 { font-size: 1.2rem; color: #fff; margin-bottom: 0.25rem; }
+  .sub { font-size: 0.8rem; color: #666; margin-bottom: 2rem; }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 2rem; }
+  .card { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 6px; padding: 1rem; }
+  .card .label { font-size: 11px; color: #666; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .card .value { font-size: 1.6rem; color: #fff; font-weight: bold; }
+  .card .value.warn { color: #E24B4A; }
+  .card .value.ok   { color: #639922; }
+  .phases { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 2rem; }
+  .phase { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 6px; padding: 1rem; }
+  .phase h2 { font-size: 0.85rem; color: #888; margin-bottom: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  .phase table { width: 100%; font-size: 12px; border-collapse: collapse; }
+  .phase td { padding: 3px 0; }
+  .phase td:last-child { text-align: right; color: #fff; }
+  .chart-wrap { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 6px; padding: 1rem; margin-bottom: 1.5rem; }
+  .chart-wrap h2 { font-size: 0.85rem; color: #888; margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  .legend { display: flex; gap: 20px; font-size: 11px; color: #666; margin-top: 10px; }
+  .legend span { display: flex; align-items: center; gap: 6px; }
+  .dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+</style>
+</head>
+<body>
+<h1>Loop Timing Report</h1>
+<div class="sub">10ms25flush.txt — 379 records</div>
+ 
+<div class="grid">
+  <div class="card"><div class="label">Total records</div><div class="value">379</div></div>
+  <div class="card"><div class="label">Flight duration</div><div class="value">1.7 s</div></div>
+  <div class="card"><div class="label">Total overruns</div><div class="value warn">61</div></div>
+  <div class="card"><div class="label">Flight budget used</div><div class="value ok">36.8%</div></div>
+</div>
+ 
+<div class="phases">
+  <div class="phase">
+    <h2>Idle phase</h2>
+    <table>
+      <tr><td style="color:#666">Records</td><td>205</td></tr>
+      <tr><td style="color:#666">Duration</td><td>2.0 s</td></tr>
+      <tr><td style="color:#666">Avg busy</td><td>2.404 ms</td></tr>
+      <tr><td style="color:#666">Budget used</td><td>24.0%</td></tr>
+      <tr><td style="color:#666">SD flush spikes</td><td style="color:#E24B4A">8</td></tr>
+      <tr><td style="color:#666">Spike interval</td><td>~251 ms</td></tr>
+      <tr><td style="color:#666">Spike dur range</td><td>57.9 – 67.0 ms</td></tr>
+    </table>
+  </div>
+  <div class="phase">
+    <h2>Flight phase (launch → apogee)</h2>
+    <table>
+      <tr><td style="color:#666">Records</td><td>174</td></tr>
+      <tr><td style="color:#666">Duration</td><td>1.7 s</td></tr>
+      <tr><td style="color:#666">Avg busy</td><td>3.682 ms</td></tr>
+      <tr><td style="color:#666">Budget used</td><td>36.8%</td></tr>
+      <tr><td style="color:#666">Headroom (avg)</td><td style="color:#639922">6.318 ms</td></tr>
+      <tr><td style="color:#666">SD flush spikes</td><td style="color:#E24B4A">7</td></tr>
+      <tr><td style="color:#666">Spike dur range</td><td>59.6 – 65.0 ms</td></tr>
+    </table>
+  </div>
+</div>
+ 
+<div class="chart-wrap">
+  <h2>Busy time per iteration (ms)</h2>
+  <div style="position:relative;height:220px;"><canvas id="c1" role="img" aria-label="Busy time chart">Busy time per loop iteration</canvas></div>
+  <div class="legend">
+    <span><span class="dot" style="background:#378ADD"></span>Idle</span>
+    <span><span class="dot" style="background:#639922"></span>Flight</span>
+    <span><span class="dot" style="background:#E24B4A"></span>SD flush spike</span>
+    <span><span class='dot' style='background:#BA7517'></span>Launch</span>
+  </div>
+</div>
+ 
+<div class="chart-wrap">
+  <h2>Loop period dt (ms) — spikes = missed deadline</h2>
+  <div style="position:relative;height:220px;"><canvas id="c2" role="img" aria-label="dt chart">Loop dt per iteration</canvas></div>
+</div>
+ 
+<script>
+const busy = [0.45, 0.06, 0.06, 0.06, 0.06, 56.74, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.17, 0.06, 0.06, 0.06, 0.06, 0.06, 60.85, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.17, 0.06, 0.06, 0.06, 0.06, 0.06, 57.93, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.07, 0.07, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.16, 0.06, 0.06, 0.06, 0.06, 0.06, 60.7, 0.07, 0.07, 0.07, 0.06, 0.06, 0.06, 0.06, 0.06, 0.07, 0.07, 0.07, 0.07, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.17, 0.06, 0.07, 0.07, 0.07, 0.07, 61.03, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.17, 0.06, 0.06, 0.06, 0.06, 0.06, 60.84, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.16, 0.06, 0.06, 0.06, 0.06, 0.06, 60.64, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.07, 0.07, 0.07, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.19, 0.06, 0.06, 0.06, 0.06, 0.06, 60.8, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.19, 0.06, 0.06, 0.06, 0.06, 0.06, 63.35, 2.39, 1.97, 1.96, 1.95, 2.31, 1.92, 1.91, 1.89, 1.88, 1.87, 1.85, 2.2, 1.82, 1.8, 1.79, 1.78, 1.76, 1.75, 1.91, 1.74, 1.72, 1.71, 1.69, 1.68, 65.27, 1.65, 1.64, 1.62, 1.61, 1.6, 1.59, 1.58, 1.56, 1.84, 1.53, 1.52, 1.51, 1.5, 1.48, 1.46, 1.45, 1.44, 1.43, 1.58, 1.68, 1.39, 1.38, 1.64, 1.62, 62.5, 1.59, 1.58, 1.31, 1.55, 1.53, 1.52, 1.5, 1.5, 1.49, 1.48, 1.48, 1.46, 1.46, 1.44, 1.43, 1.43, 1.41, 1.42, 1.55, 1.38, 1.37, 1.36, 1.36, 1.35, 61.78, 1.31, 1.3, 1.29, 1.28, 1.27, 1.27, 1.24, 1.23, 1.23, 1.21, 1.2, 1.2, 1.17, 1.16, 1.16, 1.14, 1.13, 1.13, 1.27, 1.09, 1.09, 1.07, 1.06, 1.06, 61.88, 1.02, 1.02, 1.0, 0.99, 0.98, 0.97, 0.95, 0.93, 0.93, 0.92, 0.9, 0.89, 0.88, 0.86, 0.85, 0.85, 0.83, 0.82, 0.96, 0.79, 0.78, 0.76, 0.75, 0.75, 61.31, 0.71, 0.7, 0.69, 0.68, 0.67, 0.65, 0.64, 0.62, 0.61, 0.6, 0.6, 0.58, 0.55, 0.53, 0.53, 0.52, 0.5, 0.49, 0.64, 0.47, 0.46, 0.44, 0.42, 0.42, 77.77, 0.39, 0.37, 0.36, 0.34, 0.33, 0.33, 0.3, 0.29, 0.28, 0.26, 0.26, 0.24, 0.22, 0.2, 0.19, 0.19, 0.18, 0.16, 0.29, 0.11, 0.11, 0.1, 0.09];
+const dt   = [0.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 58.13, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 57.9, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 67.01, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.01, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 61.01, 10.0, 10.0, 10.0, 10.0, 10.0, 10.01, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 60.71, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 62.32, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 60.73, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 60.47, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 61.15, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 62.46, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 65.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 60.46, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 61.32, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 61.55, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 59.58, 10.0, 10.0, 10.0, 10.0];
+const spike = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0];
+const flight = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1];
+const launchIdx = 205;
+ 
+function barColors(arr, useArr) {
+  return arr.map((_, i) => {
+    if (spike[i]) return '#E24B4A';
+    if (flight[i]) return '#639922';
+    return '#378ADD';
+  });
+}
+ 
+const opts = (yLabel, max) => ({
+  responsive: true, maintainAspectRatio: false, animation: false,
+  plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.parsed.y.toFixed(2) + ' ms' } } },
+  scales: {
+    x: { display: false },
+    y: { max, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#666', callback: v => v + ' ms' }, title: { display: true, text: yLabel, color: '#666', font: { size: 11 } } }
+  }
+});
+ 
+new Chart(document.getElementById('c1'), {
+  type: 'bar',
+  data: { labels: busy.map((_, i) => i), datasets: [{ data: busy, backgroundColor: barColors(busy), barPercentage: 1, categoryPercentage: 1 }] },
+  options: opts('ms', Math.max(...busy) * 1.1)
+});
+ 
+new Chart(document.getElementById('c2'), {
+  type: 'bar',
+  data: { labels: dt.map((_, i) => i), datasets: [
+    { data: dt, backgroundColor: barColors(dt), barPercentage: 1, categoryPercentage: 1 },
+    { type: 'line', data: dt.map(() => 10), borderColor: '#555', borderWidth: 1, borderDash: [4,4], pointRadius: 0, label: '10ms target' }
+  ] },
+  options: opts('ms', Math.max(...dt) * 1.1)
+});
+</script>
+</body>
+</html>
