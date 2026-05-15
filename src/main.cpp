@@ -22,7 +22,6 @@
 
 #define SAMPLE_RATE_MS 10  // 100 Hz
 #define SERVO_PIN 16
-#define SERVO_STEP_MS 1000
 
 #define AIRBRAKE_TEST 0
 
@@ -48,18 +47,6 @@ float barometer_raw;   // metres
 
 int loop_count = 0;
 
-static void stepServo() {
-  s_servo.write(s_servoAngle);
-
-  s_servoAngle += s_servoDirection * 10;
-  if (s_servoAngle >= 180) {
-    s_servoAngle = 180;
-    s_servoDirection = -1;
-  } else if (s_servoAngle <= 0) {
-    s_servoAngle = 0;
-    s_servoDirection = 1;
-  }
-}
 
 void setup() {
   Serial.begin(115200);
@@ -70,9 +57,6 @@ void setup() {
 
   Wire.begin(33, 32);  // SDA=GPIO33, SCL=GPIO32
 
-  s_servo.setPeriodHertz(50);
-  s_servo.attach(SERVO_PIN, 500, 2400);
-  stepServo();
 
 #if AIRBRAKE_TEST
   RunAirbrakeSim();
