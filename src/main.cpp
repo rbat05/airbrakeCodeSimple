@@ -13,7 +13,7 @@
 #include "loop_timer.h"  // ← add this
 
 #ifndef ENABLE_HITL
-#define ENABLE_HITL 1
+#define ENABLE_HITL 0
 #endif
 #if ENABLE_HITL
 #include "hitl.h"
@@ -127,6 +127,30 @@ void loop() {
   gyro_yaw = imu.gyroZ;
   accel_vertical = imu.accelY - 9.81f;
   gyro_pitch = imu.gyroX;
+
+  // Simple state machine to prevent pre-launch integration drift
+  static bool is_launched = false;
+  static int launch_frames = 0;
+
+  if (!is_launched) {
+    // Launch detection threshold: ~2.5G total acceleration (15 m/s^2 above
+    // resting gravity)
+    if (accel_vertical > 15.0f) {
+      launch_frames++;
+      if (launch_frames >= 5) {
+        is_launched = true;
+        Serial.println("[MAIN] LAUNCH DETECTED!");
+      }
+    } else {
+      launch_frames = 0;  // Reset counter if we drop below threshold
+    }
+
+    if (!is_launched) {
+      // Clamp values to prevent drift while sitting on the pad
+      accel_vertical = 0.0f;
+      velocity = 0.0f;
+    }
+  }
 
   velocity += accel_vertical * dt;
   ekf_predict(&ekf, accel_vertical, gyro_pitch, gyro_yaw);

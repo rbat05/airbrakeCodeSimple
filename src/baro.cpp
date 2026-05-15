@@ -9,7 +9,6 @@
 // This makes it so that the altitude readings are relative to the launch site
 // i.e Above Ground Level (AGL) instead of Mean Sea Level (MSL).
 #define REFERENCE_ALTITUDE_M 0.0f
-#define REFERENCE_PRESSURE_HPA 1030.4f
 
 static Adafruit_BME280 bme;
 
@@ -23,19 +22,35 @@ bool initBaro() {
     return false;
   }
 
-  s_seaLevelHPa =
-      bme.seaLevelForAltitude(REFERENCE_ALTITUDE_M, REFERENCE_PRESSURE_HPA);
-  Serial.printf(
-      "[BARO] Reference calibration: altitude=%.1f m, pressure=%.2f hPa\n",
-      REFERENCE_ALTITUDE_M, REFERENCE_PRESSURE_HPA);
-  Serial.printf("[BARO] Derived sea-level pressure: %.2f hPa\n", s_seaLevelHPa);
-
+  // Set sampling limits first so our calibration uses the correct noise filter
   // Indoor navigation mode — good balance of speed vs noise
   bme.setSampling(Adafruit_BME280::MODE_NORMAL,
                   Adafruit_BME280::SAMPLING_X2,    // temperature
                   Adafruit_BME280::SAMPLING_X16,   // pressure
                   Adafruit_BME280::SAMPLING_NONE,  // humidity disabled
                   Adafruit_BME280::FILTER_X16, Adafruit_BME280::STANDBY_MS_0_5);
+
+  // Discard first stale reading
+  bme.readPressure();
+  delay(50);
+
+  // Sample 50 times to get rolling average for pad resting pressure
+  Serial.println("[BARO] Calibrating reference pressure (taking 50 samples)...");
+  float pressureSum = 0.0f;
+  for (int i = 0; i < 50; i++) {
+    pressureSum += (bme.readPressure() / 100.0f);
+    delay(20);
+  }
+  float referencePressureHPa = pressureSum / 50.0f;
+
+  s_seaLevelHPa =
+      bme.seaLevelForAltitude(REFERENCE_ALTITUDE_M, referencePressureHPa);
+      
+  Serial.printf(
+      "[BARO] Reference calibration: altitude=%.1f m, pressure=%.2f hPa\n",
+      REFERENCE_ALTITUDE_M, referencePressureHPa);
+  Serial.printf("[BARO] Derived sea-level pressure: %.2f hPa\n", s_seaLevelHPa);
+
   Serial.println("[BARO] BME280 initialised");
   return true;
 }
