@@ -9,7 +9,7 @@
 // This makes it so that the altitude readings are relative to the launch site
 // i.e Above Ground Level (AGL) instead of Mean Sea Level (MSL).
 #define REFERENCE_ALTITUDE_M 0.0f
-#define REFERENCE_PRESSURE_HPA 1018.3f
+#define REFERENCE_PRESSURE_HPA 1030.4f
 
 static Adafruit_BME280 bme;
 

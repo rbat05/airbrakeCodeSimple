@@ -13,7 +13,7 @@
 
 // Set to 1 to enable Hardware-In-The-Loop simulation, 0 for real sensors
 #ifndef ENABLE_HITL
-#define ENABLE_HITL 1
+#define ENABLE_HITL 0
 #endif
 
 #if ENABLE_HITL
@@ -24,10 +24,13 @@
 #define SERVO_PIN 16
 #define SERVO_STEP_MS 1000
 
+#define SERVO_MIN_ANGLE 63
+#define SERVO_MAX_ANGLE 165
+
 #define AIRBRAKE_TEST 0
 
 static Servo s_servo;
-static int s_servoAngle = 0;
+static int s_servoAngle = SERVO_MIN_ANGLE;
 static int s_servoDirection = 1;
 static uint32_t s_lastServoStepMs = 0;
 static uint32_t s_profileStartMs = 0;
@@ -52,11 +55,11 @@ static void stepServo() {
   s_servo.write(s_servoAngle);
 
   s_servoAngle += s_servoDirection * 10;
-  if (s_servoAngle >= 180) {
-    s_servoAngle = 180;
+  if (s_servoAngle >= SERVO_MAX_ANGLE) {
+    s_servoAngle = SERVO_MAX_ANGLE;
     s_servoDirection = -1;
-  } else if (s_servoAngle <= 0) {
-    s_servoAngle = 0;
+  } else if (s_servoAngle <= SERVO_MIN_ANGLE) {
+    s_servoAngle = SERVO_MIN_ANGLE;
     s_servoDirection = 1;
   }
 }
@@ -72,7 +75,6 @@ void setup() {
 
   s_servo.setPeriodHertz(50);
   s_servo.attach(SERVO_PIN, 500, 2400);
-  stepServo();
 
 #if AIRBRAKE_TEST
   RunAirbrakeSim();
@@ -92,6 +94,35 @@ void setup() {
   Serial.printf("[MAIN] IMU init: %s\n", imuOk ? "OK" : "FAIL");
   Serial.printf("[MAIN] Baro init: %s\n", baroOk ? "OK" : "FAIL");
   Serial.printf("[MAIN] BinLog init: %s\n", binOk ? "OK" : "FAIL");
+
+  if (binOk) {
+    Serial.println("[MAIN] SD Card successfully mounted and ready.");
+  } else {
+    Serial.println(
+        "[MAIN] SD Card initialization FAILED. Check wiring/SD card.");
+  }
+
+  // Prints out sensor readings
+  while (true) {
+#if ENABLE_HITL
+    updateHITL();
+    IMUData imu = readIMUHITL();
+    BaroData baro = readBaroHITL();
+#else
+    IMUData imu = readIMU();
+    BaroData baro = readBaro();
+#endif
+
+    // Print all data on a single line
+    Serial.printf(
+        "[DEBUG] IMU: accel[%.2f, %.2f, %.2f] gyro[%.2f, %.2f, %.2f] | Baro: "
+        "alt=%.2fm press=%.2fhPa | Servo: %d deg\n",
+        imu.accelX, imu.accelY, imu.accelZ, imu.gyroX, imu.gyroY, imu.gyroZ,
+        baro.altitudeM, baro.pressureHPa, s_servoAngle);
+
+    stepServo();  // Steps by 10 degress, back and forth
+    delay(100);   // Print at 10Hz so it doesn't flood the terminal too fast
+  }
 
   float h0 = 0;
 
