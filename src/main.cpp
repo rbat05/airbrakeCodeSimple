@@ -26,6 +26,8 @@ float u = 0.0f;
 float h_pred = 0.0f;
 float gyro_yaw, accel_vertical, gyro_pitch, barometer_raw;
 int loop_count = 0;
+uint32_t prev_optimise_time = 0;
+int control_count = 0;
 
 // ── FreeRTOS Dual-Core Logging ──────────────────────────────────────────────
 struct LogMessage {
@@ -83,6 +85,14 @@ void setup() {
   } else {
     Serial.println("[MAIN] ERROR: Could not create log queue!");
   }
+
+
+  SetServoAngle(START_ANGLE);
+  delay(2000);
+  SetServoAngle(END_ANGLE);
+  delay(2000);
+  SetServoAngle(START_ANGLE);
+
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -111,7 +121,7 @@ void loop() {
       launch_frames++;
       if (launch_frames >= 5) {
         is_launched = true;
-        Serial.println("[MAIN] LAUNCH DETECTED!");
+        // Serial.println("[MAIN] LAUNCH DETECTED!");
       }
     } else {
       launch_frames = 0;  // Reset counter if we drop below threshold
@@ -137,11 +147,18 @@ void loop() {
 
   // ── MPC ───────────────────────────────────────────────────────────────────
   if (ekf.x[0] > 100.0f) {
-    u = OptimiseControlInputBinarySearchConstraint(ekf.x[0], velocity, u_prev,
-                                                   0);
-    SetServoAngle(u);
-    u_prev = u;
-    h_pred = PredictApogee(ekf.x[0], velocity, u);
+    
+    uint32_t current_time = millis();
+    if (control_count == 0) {
+      control_count++;
+    } else {
+      float time_since_prev = (current_time - prev_optimise_time) / 1000.0f; // seconds
+      u = OptimiseControlInputBinarySearchConstraint(ekf.x[0], velocity, u_prev,time_since_prev);
+      SetServoAngle(u);
+      u_prev = u;
+      prev_optimise_time = current_time;
+      h_pred = PredictApogee(ekf.x[0], velocity, u);
+    }
   }
 
   ModelData modelData = setModelData(h_pred, u);

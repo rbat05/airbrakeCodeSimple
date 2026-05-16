@@ -57,17 +57,10 @@ float GetCd(float u) {
 // neeed to improve this to take into account when the airbrakes will actually
 // be at given deployment (lag)
 float PredictApogee(float h_sim_predict, float v_sim_predict, float u) {
+ 
   // finding dt based on altitude
-  float h_burnout = 120.0f;
-  float h_final = href;
-
-  // float dt = (predict_dt - predict_dt_final) / (h_burnout - h_final) *
-  //                (h_sim_predict - h_burnout) +
-  //            predict_dt;
-  // dt = MIN(predict_dt, MAX(dt, predict_dt_final));
 
   float dt = 0.05;
-
   // dt   // slightly bigger for speed - smaller more accurate - doesnt have to
   // be same as control loop
   float Cd = GetCd(u);  // replace with cfd lookup
@@ -145,8 +138,7 @@ float OptimiseControlInputBinarySearch(float h, float v, float u_prev) {
 
 // this optimiser does the same as above but takes into acconut servo speed
 // limits
-float OptimiseControlInputBinarySearchConstraint(float h, float v, float u_prev,
-                                                 int iteration) {
+float OptimiseControlInputBinarySearchConstraint(float h, float v, float u_prev, float dt) {
   // need to use servo speed as constraint - optimisation will change alot
   int optimiser_array_length = 21;
   float min_error = 500.0;
@@ -156,20 +148,14 @@ float OptimiseControlInputBinarySearchConstraint(float h, float v, float u_prev,
   int L = 0;
   int R = length;
   int m;
-  float udt_max =
-      (60.0 / 0.2) * loop_dt;  // need to update to include gear ratio
+  // float udt_max = (60.0 / 0.2) * loop_dt;  // need to update to include gear ratio
+  float udt_max = (60.0 / 0.2) * dt;  // need to update to include gear ratio
 
   float u_constrained_max = MIN(u_max, u_prev + udt_max);
   float u_constrained_min = MAX(0, u_prev - udt_max);
 
   float u_range = u_constrained_max - u_constrained_min;
 
-  // debug print
-  if (iteration == 0 || iteration == 1 || iteration == 2 || iteration == 3 ||
-      iteration == 4 || iteration == 5 || iteration == 6) {
-    //  Serial.printf("udt_max: %.3f ,uprev = %.3f, u_min = %.3f, umax =
-    //  %.3f\n",udt_max, u_prev, u_constrained_min, u_constrained_max);
-  }
   int count = 0;
 
   while (1) {
@@ -208,24 +194,6 @@ float OptimiseControlInputBinarySearchConstraint(float h, float v, float u_prev,
 
 // ---  embedded functions
 
-// this functions returns 1 if launch is detected
-// should use interrupt
-int LaunchDetected() { return 1; }
-
-// this function returns 1 if coast phase has been detected
-// uses both accelerometer data and time since launch - can place weightings on
-// each
-// - should use interrupt
-int CoastDetected(int launch_time) {
-  // need to update to use accelerometer
-  int time_since_launch = esp_timer_get_time() - launch_time;
-  if (time_since_launch >
-      (float)((burn_time + active_time_offset) * 1000000.0f)) {
-    return 1;
-  } else {
-    return 0;
-  }
-}
 
 // this function returns 1 if apogee is detected
 // should use interrupt
