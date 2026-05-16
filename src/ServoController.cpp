@@ -49,6 +49,7 @@ void SetServoAngle(float angle_deg) {
    angle_deg = MAX(0.0,MIN(70.0,angle_deg));
    float actuate_angle = START_ANGLE + (END_ANGLE - START_ANGLE)/70.0*angle_deg;
    uint32_t pulse = angleToPulse(actuate_angle);
+   Serial.printf("Servo angle: %.2f\n", actuate_angle);
    SetServoPulseUs(pulse);
 }
 

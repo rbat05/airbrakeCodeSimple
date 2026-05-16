@@ -87,11 +87,11 @@ void setup() {
   }
 
 
-  SetServoAngle(START_ANGLE);
+  SetServoAngle(0.0);
   delay(2000);
-  SetServoAngle(END_ANGLE);
+  SetServoAngle(70.0);
   delay(2000);
-  SetServoAngle(START_ANGLE);
+  SetServoAngle(0.0);
 
 }
 
