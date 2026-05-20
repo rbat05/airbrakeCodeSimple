@@ -6,3 +6,4 @@
 .venv/
 *.bin
 *.csv
+!time_filtered.csv
