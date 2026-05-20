@@ -1,12 +1,15 @@
 #include "Dynamics.h"
 
-#include <Arduino.h>
 #include <math.h>
 #include <stdio.h>
 
 #include "RocketVariables.h"
+#ifndef DESKTOP_SIM
+#include <Arduino.h>
+
 #include "ServoController.h"
 #include "esp_timer.h"
+#endif
 
 // ---- helpers ----
 float ABS(float a) { return (a < 0.0f) ? -a : a; }
@@ -218,6 +221,9 @@ int LaunchDetected() { return 1; }
 // - should use interrupt
 int CoastDetected(int launch_time) {
   // need to update to use accelerometer
+#ifdef DESKTOP_SIM
+  return 1;
+#else
   int time_since_launch = esp_timer_get_time() - launch_time;
   if (time_since_launch >
       (float)((burn_time + active_time_offset) * 1000000.0f)) {
@@ -225,6 +231,7 @@ int CoastDetected(int launch_time) {
   } else {
     return 0;
   }
+#endif
 }
 
 // this function returns 1 if apogee is detected
@@ -232,7 +239,9 @@ int CoastDetected(int launch_time) {
 int ApogeeDetected() {
   // need to update to only return 1 if velocity is held near 0 for certain time
   if (state.v < 0.5 && state.h > 100.0) {
+#ifndef DESKTOP_SIM
     SetServoAngle(0.0);  // u = 0–180 degrees
+#endif
     return 1;
   } else {
     return 0;
