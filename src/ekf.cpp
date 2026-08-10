@@ -84,8 +84,7 @@ static void ekf_compute_noise_matrices(EKF* ekf) {
   float sigma_gyro = GYRO_NOISE_DENSITY * (3.14159265358979323846f / 180.0f) *
                      sqrtf(GYRO_SAMPLE_RATE);
 
-  // Attitude uncertainty: integrating gyro noise once scales     #define
-  // PI() 3.14159265358979323846f    #define PI() 3.14159265358979323846fby dt
+  // Attitude uncertainty: integrating gyro noise once scales by dt
   // Same value for pitch and yaw — same physical sensor
   float q_theta = (sigma_gyro * dt) * (sigma_gyro * dt);
 
@@ -108,7 +107,12 @@ static void ekf_compute_noise_matrices(EKF* ekf) {
 
   // --- R (scalar) ---
   // Baro height variance: R = sigma^2 = 1.7^2 = 2.89 m^2
-  ekf->R = BARO_RMS_NOISE * BARO_RMS_NOISE;
+  // This is the NOMINAL value from the static sensor spec. Store it in
+  // R_base and also use it as the initial effective R. Flight-phase logic
+  // in main.cpp can later scale R away from R_base via ekf_set_r_scale()
+  // without ever losing the nominal value to go back to.
+  ekf->R_base = BARO_RMS_NOISE * BARO_RMS_NOISE;
+  ekf->R = ekf->R_base;
 }
 
 // ============================================================
@@ -139,7 +143,7 @@ void ekf_init(EKF* ekf, float dt_seconds, float h0) {
   ekf->P[5][5] = 0.01f;  // yaw gyro bias: wide prior
   ekf->P[6][6] = 1.0f;   // accel bias: wide prior (MPU-6050 bias is unreliable)
 
-  // Compute Q and R from sensor parameters
+  // Compute Q and R (and R_base) from sensor parameters
   ekf_compute_noise_matrices(ekf);
 }
 
@@ -166,6 +170,10 @@ void ekf_predict(EKF* ekf, float a_body, float w_pitch, float w_yaw) {
   // ----------------------------------------------------------
 
   // Remove estimated bias from raw IMU readings
+  // NOTE: a_body must be the RAW accel reading (gravity still included).
+  // Gravity is removed once, below, via "- G" in a_net. If gravity has
+  // already been subtracted by the caller, it gets removed twice here —
+  // that's a real bug to watch for, not a modelling choice.
   float a_true = a_body - b_acc;
   float wp_true = w_pitch - b_gyro_p;
   float wy_true = w_yaw - b_gyro_y;
@@ -276,6 +284,16 @@ void ekf_predict(EKF* ekf, float a_body, float w_pitch, float w_yaw) {
 }
 
 // ============================================================
+// PUBLIC: SET MEASUREMENT NOISE SCALE
+// Call once per loop (before ekf_update) with the scale your
+// flight-phase logic wants this cycle. scale=1.0 -> nominal trust.
+// ============================================================
+
+void ekf_set_r_scale(EKF* ekf, float scale) {
+  ekf->R = ekf->R_base * scale;
+}
+
+// ============================================================
 // PUBLIC: UPDATE STEP
 // Call when a new baro reading is available (slow loop, e.g. 25Hz)
 // ============================================================
@@ -290,6 +308,8 @@ void ekf_update(EKF* ekf, float z_baro) {
 
   // Innovation covariance S = H*P*H^T + R
   // H=[1,0,...,0] so H*P*H^T = P[0][0]
+  // R here is whatever ekf_set_r_scale() last set it to — nominal unless
+  // the caller has inflated it (e.g. during motor burn).
   float S = ekf->P[0][0] + ekf->R;
 
   // Kalman gain K = P*H^T / S

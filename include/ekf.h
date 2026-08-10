@@ -44,20 +44,28 @@
 #define GYRO_BIAS_INSTABILITY 0.1f  // deg/s          — bias drift per step
 #define GYRO_SAMPLE_RATE 100.0f     // Hz
 
-#define BARO_RMS_NOISE 1.7f  // metres RMS — BME280 0.2hPa noise spec
+#define BARO_RMS_NOISE 1.7f  // metres RMS — BME280 0.2hPa noise spec (nominal, static conditions)
 
 // ============================================================
 // EKF STRUCT
 //
 // Holds all filter state. Declare one globally in main and
 // pass a pointer into every EKF function call.
+//
+// R      : the EFFECTIVE measurement noise currently in use.
+//          This is what ekf_update() actually reads.
+// R_base : the NOMINAL measurement noise from the sensor spec,
+//          computed once at init. ekf_set_r_scale() scales R_base
+//          to produce R — it never overwrites R_base — so you can
+//          always get back to nominal trust in the baro.
 // ============================================================
 
 typedef struct {
   float x[EKF_N];         // state vector — current best estimate
   float P[EKF_N][EKF_N];  // covariance matrix — uncertainty about x
   float Q[EKF_N][EKF_N];  // process noise matrix — IMU noise per step
-  float R;                // measurement noise — baro variance (m^2)
+  float R;                // measurement noise IN USE (R_base * scale)
+  float R_base;            // nominal measurement noise (m^2), fixed after init
   float dt;               // predict step timestep (s)
 } EKF;
 
@@ -86,12 +94,14 @@ EKFData setEKFData(float filtered_height, float filtered_velocity,
 void ekf_init(EKF* ekf, float dt_seconds, float h0);
 
 // Predict step. Call every IMU sample (fast loop).
-//   a_body  : accelerometer body vertical axis (m/s^2) — az converted from raw
+//   a_body  : RAW accelerometer body vertical axis (m/s^2), gravity
+//             STILL INCLUDED — do not subtract 9.81 before calling this.
+//             The subtraction happens internally in ekf_predict().
 //   w_pitch : pitch gyro rate (rad/s)                 — gy converted from raw
 //   w_yaw   : yaw gyro rate (rad/s)                   — gz converted from raw
 //
 // Convert raw MPU-6050 values before calling:
-//   a_body  = az_raw * (9.81f / 16384.0f)
+//   a_body  = az_raw * (9.81f / 16384.0f)      // NOTE: do NOT subtract 9.81f here
 //   w_pitch = gy_raw * (M_PI / (180.0f * 131.0f))
 //   w_yaw   = gz_raw * (M_PI / (180.0f * 131.0f))
 void ekf_predict(EKF* ekf, float a_body, float w_pitch, float w_yaw);
@@ -100,6 +110,16 @@ void ekf_predict(EKF* ekf, float a_body, float w_pitch, float w_yaw);
 //   z_baro : barometer height (m) relative to pad
 //            must use same reference pressure as h0 in ekf_init()
 void ekf_update(EKF* ekf, float z_baro);
+
+// Scale the measurement noise away from its nominal value.
+//   scale == 1.0f : trust the baro at its nominal spec (default after init)
+//   scale >> 1.0f : distrust the baro (use during motor burn, when vibration
+//                   and dynamic pressure make baro readings unreliable —
+//                   this drives the Kalman gain toward zero smoothly,
+//                   without discontinuously skipping ekf_update() outright)
+// Call this once per loop, before ekf_update(), with whatever scale your
+// flight-phase logic decides on that iteration.
+void ekf_set_r_scale(EKF* ekf, float scale);
 
 // Accessors — read estimated states after each predict/update call
 float ekf_get_height(EKF* ekf);    // metres above pad
